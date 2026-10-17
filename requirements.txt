@@ -18,5 +18,5 @@ requests==2.31.0
 pyaml==23.9.7
 beautifulsoup4==4.12.2
 lxml==4.9.3
-pycvss==1.6.1
+pycvss==1.0.2
 gunicorn==23.0.0
