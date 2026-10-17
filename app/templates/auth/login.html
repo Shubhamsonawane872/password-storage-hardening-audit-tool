@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Password Audit Tool{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h1>Sign In</h1>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+                <small id="emailError" class="error-message"></small>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+                <small id="passwordError" class="error-message"></small>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
+        </form>
+
+        <p class="auth-footer">
+            Don't have an account? <a href="/register">Create one</a>
+        </p>
+    </div>
+</div>
+
+<style>
+.auth-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 200px);
+    padding: 20px;
+}
+
+.auth-card {
+    background: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 400px;
+}
+
+.auth-card h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: var(--primary);
+}
+
+.error-message {
+    color: var(--danger);
+    font-size: 12px;
+    display: block;
+    margin-top: 3px;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.auth-footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.auth-footer a:hover {
+    text-decoration: underline;
+}
+</style>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    
+    // Clear errors
+    document.getElementById('emailError').textContent = '';
+    document.getElementById('passwordError').textContent = '';
+    
+    if (!email || !password) {
+        showAlert('Email and password required', 'error');
+        return;
+    }
+    
+    try {
+        const response = await apiFetch('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+        });
+        
+        showAlert('Login successful!', 'success');
+        setTimeout(() => {
+            window.location.href = '/dashboard';
+        }, 1000);
+    } catch (error) {
+        if (error.status === 429) {
+            showAlert('Too many login attempts. Please try again later.', 'error');
+        } else {
+            showAlert('Invalid email or password', 'error');
+        }
+    }
+});
+</script>
+{% endblock %}

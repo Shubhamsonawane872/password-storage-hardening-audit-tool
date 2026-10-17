@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Password Audit Tool{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-current">Dashboard</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+  <!-- Header row -->
+  <div class="page-header flex items-center justify-between flex-wrap gap-2 mb-3">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">Your security audit overview</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/scan"    class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Scan
+      </a>
+      <a href="/history" class="btn btn-ghost">View All Scans</a>
+    </div>
+  </div>
+
+  <!-- Stat grid -->
+  <div class="stat-grid mb-3" id="statGrid">
+    <div class="stat-box stat-primary">
+      <span class="stat-label">Total Scans</span>
+      <span class="stat-number" id="statTotalScans">—</span>
+    </div>
+    <div class="stat-box stat-critical">
+      <span class="stat-label">Critical</span>
+      <span class="stat-number" id="statCritical">—</span>
+    </div>
+    <div class="stat-box stat-high">
+      <span class="stat-label">High</span>
+      <span class="stat-number" id="statHigh">—</span>
+    </div>
+    <div class="stat-box stat-medium">
+      <span class="stat-label">Medium</span>
+      <span class="stat-number" id="statMedium">—</span>
+    </div>
+    <div class="stat-box stat-low">
+      <span class="stat-label">Low</span>
+      <span class="stat-number" id="statLow">—</span>
+    </div>
+    <div class="stat-box stat-info">
+      <span class="stat-label">Info</span>
+      <span class="stat-number" id="statInfo">—</span>
+    </div>
+  </div>
+
+  <!-- Charts + score row -->
+  <div class="grid grid-3 mb-3">
+
+    <!-- Severity donut -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Severity Breakdown</span>
+      </div>
+      <div style="position:relative;height:220px;display:flex;align-items:center;justify-content:center;">
+        <canvas id="severityChart"></canvas>
+        <div id="donutCenter" style="position:absolute;text-align:center;pointer-events:none;">
+          <div style="font-size:26px;font-weight:700;" id="donutTotal">0</div>
+          <div style="font-size:11px;color:var(--text3);">Findings</div>
+        </div>
+      </div>
+      <div id="severityLegend" class="flex flex-wrap gap-2 mt-2" style="font-size:12px;"></div>
+    </div>
+
+    <!-- 30-day trend line -->
+    <div class="card" style="grid-column: span 2;">
+      <div class="card-header">
+        <span class="card-title">30-Day Scan Activity</span>
+        <span id="trendBadge" style="font-size:12px;font-weight:600;"></span>
+      </div>
+      <div style="height:220px;">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Security score + rule distribution row -->
+  <div class="grid grid-2 mb-3">
+
+    <!-- Security score card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Latest Security Score</span>
+      </div>
+      <div id="scoreWidget" class="flex items-center gap-3 mb-2">
+        <div class="grade-badge" id="gradeBadge" style="font-size:24px;width:60px;height:60px;">—</div>
+        <div>
+          <div style="font-size:28px;font-weight:800;" id="scoreNum">—</div>
+          <div style="font-size:13px;color:var(--text3);">out of 100</div>
+        </div>
+        <div id="improvementBadge" style="margin-left:auto;"></div>
+      </div>
+      <div class="progress" style="margin-bottom:12px;">
+        <div class="progress-fill" id="scoreBar" style="width:0%;background:var(--success);"></div>
+      </div>
+      <p id="scoreMessage" style="font-size:13px;color:var(--text3);"></p>
+    </div>
+
+    <!-- Top triggered rules bar chart -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Top Triggered Rules</span>
+      </div>
+      <div style="height:220px;">
+        <canvas id="ruleChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Recent scans table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Recent Scans</span>
+      <a href="/history" class="btn btn-ghost btn-sm">See all →</a>
+    </div>
+    <div id="recentScans">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+</div><!-- /page-container -->
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Dashboard — data loading + Chart.js visualisation
+══════════════════════════════════════════════════════════════════════════ */
+
+const SEV_COLORS = {
+  critical: '#dc2626',
+  high:     '#ea580c',
+  medium:   '#ca8a04',
+  low:      '#16a34a',
+  info:     '#0284c7',
+};
+
+function getCSSVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function isDark() {
+  return document.documentElement.dataset.theme === 'dark';
+}
+
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+
+// ── Severity donut ────────────────────────────────────────────────────────
+let severityChart = null;
+function buildDonut(breakdown) {
+  const labels = ['Critical','High','Medium','Low','Info'];
+  const values = [
+    breakdown.critical, breakdown.high,
+    breakdown.medium,   breakdown.low, breakdown.info,
+  ];
+  const total = values.reduce((a,b)=>a+b, 0);
+  document.getElementById('donutTotal').textContent = total;
+
+  const ctx = document.getElementById('severityChart').getContext('2d');
+  if (severityChart) severityChart.destroy();
+  severityChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: Object.values(SEV_COLORS),
+        borderWidth: 3,
+        borderColor: getCSSVar('--surface'),
+        hoverOffset: 6,
+      }],
+    },
+    options: {
+      cutout: '68%',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.raw} (${total ? Math.round(ctx.raw/total*100) : 0}%)`,
+          },
+        },
+      },
+    },
+  });
+
+  // Custom legend
+  const leg = document.getElementById('severityLegend');
+  leg.innerHTML = labels.map((l,i) => `
+    <span style="display:inline-flex;align-items:center;gap:4px;">
+      <span style="width:10px;height:10px;border-radius:2px;background:${Object.values(SEV_COLORS)[i]};display:inline-block;"></span>
+      ${l} <strong>${values[i]}</strong>
+    </span>`).join('');
+}
+
+// ── 30-day trend line ─────────────────────────────────────────────────────
+let trendChart = null;
+function buildTrend(data) {
+  const labels   = data.trends.map(t => t.date);
+  const scans    = data.trends.map(t => t.scans);
+  const findings = data.trends.map(t => t.findings);
+  const gridCol  = isDark() ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.06)';
+
+  // Trend badge
+  const badge = document.getElementById('trendBadge');
+  if (data.trends.length >= 2) {
+    const first = data.trends[0].findings;
+    const last  = data.trends[data.trends.length-1].findings;
+    const dir   = last > first ? '↑ Increasing' : last < first ? '↓ Decreasing' : '→ Stable';
+    const col   = last > first ? 'var(--danger)' : last < first ? 'var(--success)' : 'var(--text3)';
+    badge.textContent = dir;
+    badge.style.color = col;
+  }
+
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Findings',
+          data: findings,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,.12)',
+          fill: true,
+          tension: .35,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+        {
+          label: 'Scans',
+          data: scans,
+          borderColor: '#5b6cf9',
+          backgroundColor: 'rgba(91,108,249,.08)',
+          fill: false,
+          tension: .35,
+          pointRadius: 3,
+          borderDash: [4,3],
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          grid: { color: gridCol },
+          ticks: { color: 'var(--text3)', maxTicksLimit: 8, font: { size: 11 } },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: gridCol },
+          ticks: { color: 'var(--text3)', font: { size: 11 }, stepSize: 1 },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: { color: getCSSVar('--text2'), font: { size: 12 }, boxWidth: 12 },
+        },
+      },
+    },
+  });
+}
+
+// ── Rule distribution bar ─────────────────────────────────────────────────
+let ruleChart = null;
+function buildRuleChart(dist) {
+  const top = dist.rules.slice(0, 7);
+  const gridCol = isDark() ? 'rgba(255,255,255,.07)' : 'rgba(0,0,0,.06)';
+  const ctx = document.getElementById('ruleChart').getContext('2d');
+  if (ruleChart) ruleChart.destroy();
+  ruleChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(r => r.rule_id),
+      datasets: [{
+        label: 'Findings',
+        data: top.map(r => r.count),
+        backgroundColor: top.map(r => SEV_COLORS[r.severity] || '#5b6cf9'),
+        borderRadius: 4,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      scales: {
+        x: {
+          grid: { color: gridCol },
+          ticks: { color: 'var(--text3)', font: { size: 11 }, stepSize: 1 },
+          beginAtZero: true,
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: 'var(--text2)', font: { size: 12, weight: '600' } },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterLabel: ctx => {
+              const rule = top[ctx.dataIndex];
+              return rule ? rule.title : '';
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+// ── Security score widget ─────────────────────────────────────────────────
+function renderScore(score, grade, improvement) {
+  const numEl  = document.getElementById('scoreNum');
+  const barEl  = document.getElementById('scoreBar');
+  const gradeEl= document.getElementById('gradeBadge');
+  const msgEl  = document.getElementById('scoreMessage');
+  const impEl  = document.getElementById('improvementBadge');
+
+  numEl.textContent  = score !== null ? Math.round(score) : '—';
+  gradeEl.textContent= grade || '—';
+
+  // Animate progress bar
+  setTimeout(() => { barEl.style.width = `${score || 0}%`; }, 100);
+
+  // Colour bar by score
+  barEl.style.background =
+    score >= 80 ? 'var(--success)' :
+    score >= 60 ? 'var(--warning)' : 'var(--danger)';
+
+  // Grade badge colour
+  gradeEl.className = `grade-badge grade-${(grade||'F').replace('+','\\+')}`;
+
+  // Message
+  const msgs = {
+    'A+': 'Excellent — no critical issues found.',
+    'A' : 'Very good security posture.',
+    'B' : 'Good, but some improvements possible.',
+    'C' : 'Fair — several issues need attention.',
+    'D' : 'Poor — significant vulnerabilities present.',
+    'F' : 'Critical issues must be resolved immediately.',
+  };
+  msgEl.textContent = msgs[grade] || '';
+
+  // Improvement badge
+  if (improvement) {
+    const pct = improvement.improvement_percentage;
+    const up  = pct > 0;
+    impEl.innerHTML = `
+      <span style="
+        display:inline-flex;align-items:center;gap:4px;
+        padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;
+        background:${up ? 'var(--success-l)' : 'var(--danger-l)'};
+        color:${up ? 'var(--success)' : 'var(--danger)'};">
+        ${up ? '▼' : '▲'} ${Math.abs(pct)}%
+        <span style="font-weight:400;opacity:.8;">${up ? 'fewer findings' : 'more findings'}</span>
+      </span>`;
+  }
+}
+
+// ── Recent scans table ────────────────────────────────────────────────────
+function renderRecentScans(scans) {
+  const el = document.getElementById('recentScans');
+  if (!scans.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📂</div>
+        <div class="empty-title">No scans yet</div>
+        <div class="empty-desc">Upload source code to find password vulnerabilities.</div>
+        <a href="/scan" class="btn btn-primary">Start Your First Scan</a>
+      </div>`;
+    return;
+  }
+
+  const rows = scans.map(s => {
+    const date  = new Date(s.created_at).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+    const grade = s.security_grade ? `<span class="grade-badge grade-${s.security_grade.replace('+','\\+')} " style="width:28px;height:28px;font-size:13px;">${s.security_grade}</span>` : '—';
+    return `<tr>
+      <td><strong>${escapeHtml(s.original_filename || '(unnamed)')}</strong></td>
+      <td><span class="badge badge-${s.scan_status}">${s.scan_status}</span></td>
+      <td>${s.total_files_scanned ?? 0}</td>
+      <td>${s.total_findings ?? 0}</td>
+      <td><span class="badge badge-critical">${s.critical_count ?? 0}</span></td>
+      <td><span class="badge badge-high">${s.high_count ?? 0}</span></td>
+      <td>${grade}</td>
+      <td style="color:var(--text3);font-size:13px;">${date}</td>
+      <td><a href="/scan/${s.id}" class="btn btn-ghost btn-sm">View</a></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr>
+          <th>File</th><th>Status</th><th>Files</th><th>Findings</th>
+          <th>Critical</th><th>High</th><th>Grade</th><th>Date</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Load all data ─────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    // Parallel requests
+    const [stats, trends, ruleDist, breakdown, improvement] = await Promise.all([
+      apiFetch('/dashboard/stats'),
+      apiFetch('/v2/analytics/trends?days=30'),
+      apiFetch('/v2/analytics/rule-distribution'),
+      apiFetch('/v2/analytics/severity-breakdown'),
+      apiFetch('/v2/analytics/improvement'),
+    ]);
+
+    // Populate stat boxes
+    document.getElementById('statTotalScans').textContent = stats.stats.total_scans;
+    document.getElementById('statCritical').textContent   = stats.stats.critical_count ?? stats.stats.high_count ?? 0;
+    document.getElementById('statHigh').textContent       = stats.stats.high_count ?? 0;
+    document.getElementById('statMedium').textContent     = stats.stats.medium_count ?? 0;
+    document.getElementById('statLow').textContent        = stats.stats.low_count ?? 0;
+    document.getElementById('statInfo').textContent       = stats.stats.info_count ?? 0;
+
+    // Charts
+    buildDonut(breakdown);
+    buildTrend(trends);
+    buildRuleChart(ruleDist);
+
+    // Score — use latest scan's grade
+    const recent = stats.recent_scans;
+    const latestWithGrade = recent.find(s => s.security_grade);
+    renderScore(
+      latestWithGrade?.security_score ?? null,
+      latestWithGrade?.security_grade ?? null,
+      improvement,
+    );
+
+    renderRecentScans(recent);
+
+  } catch (err) {
+    showAlert('Failed to load dashboard data.', 'error');
+    console.error(err);
+  }
+}
+
+// Re-render charts when theme changes (colour vars change)
+document.getElementById('themeToggle')?.addEventListener('click', () => {
+  setTimeout(() => {
+    // force redraw with updated CSS vars
+    if (severityChart) severityChart.update();
+    if (trendChart)    trendChart.update();
+    if (ruleChart)     ruleChart.update();
+  }, 50);
+});
+
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

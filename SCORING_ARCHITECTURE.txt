@@ -1,0 +1,434 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    PASSWORD AUDIT TOOL v2.0                                   ║
+║              COMPREHENSIVE MULTI-ALGORITHM SCORING ARCHITECTURE               ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+SYSTEM FLOW
+═════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────┐
+│  USER UPLOADS CODE  │
+│  (.py/.js/.php)     │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────────────────────┐
+│  SCANNER ANALYSIS                   │
+│  ├─ Regex patterns (13 rules)        │
+│  ├─ AST analysis                     │
+│  └─ Confidence scoring (0-1)         │
+└──────────┬──────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────┐
+│  FINDINGS AGGREGATION               │
+│  ├─ Severity: critical/high/med/low │
+│  ├─ Confidence: per-finding trust   │
+│  ├─ File location: context analysis │
+│  └─ Total: N findings with metadata │
+└──────────┬──────────────────────────┘
+           │
+           ▼
+      ╔════════════════════╗
+      ║  COMPREHENSIVE     ║
+      ║  SCORER ENGINE     ║  ← Master Orchestrator
+      ║  (Python Class)    ║
+      ╚════════════════════╝
+           │
+    ┌──────┼──────┬──────────┬──────────┐
+    │      │      │          │          │
+    ▼      ▼      ▼          ▼          ▼
+  ╔══╗  ╔══╗  ╔══╗        ╔══╗       ╔══╗
+  ║1 ║  ║2 ║  ║3 ║        ║4 ║       ║5 ║
+  ╚══╝  ╚══╝  ╚══╝        ╚══╝       ╚══╝
+   │     │     │           │          │
+   │     │     │           │          │
+   ▼     ▼     ▼           ▼          ▼
+
+═════════════════════════════════════════════════════════════════════════════════
+ALGORITHM 1: CVSS v3.1-INSPIRED SCORER (0-10)
+═════════════════════════════════════════════════════════════════════════════════
+
+Input:  Findings with severity, confidence, context
+        
+Process:
+        Base Score
+        [Critical: 9.0, High: 7.0, Medium: 5.0, Low: 3.0]
+              │
+              ▼
+        Environmental Factors (Multiplier)
+        [Auth: 1.4x, Production: 1.3x, Admin: 1.5x, Test: 0.3x]
+              │
+              ▼
+        Confidence Adjustment (0-1)
+        [0.98 = 98% certain]
+              │
+              ▼
+        Final Score = Base × EnvFactor × Confidence
+        Capped at: 10.0 max
+        
+Output: CVSS Score (0-10) + Breakdown by severity
+
+Example:
+        Plaintext password in auth.py
+        Base: 9.0 × (1.4 × 1.3) × 0.98 = 15.98 → 10.0
+
+═════════════════════════════════════════════════════════════════════════════════
+ALGORITHM 2: WEIGHTED AGGREGATE SCORER (0-100)
+═════════════════════════════════════════════════════════════════════════════════
+
+Input:  Findings with severity, confidence
+        
+Process:
+        Start: 100 (Perfect)
+              │
+              ▼
+        Calculate Weights:
+        [Critical: -40, High: -25, Medium: -12, Low: -5, Info: -1]
+              │
+              ▼
+        Apply Confidence (Multiply by 0-1):
+        [Weight × Confidence per finding]
+              │
+              ▼
+        Total Weighted Points
+              │
+              ▼
+        Reduction Factor × 0.8
+              │
+              ▼
+        Score = 100 - (Total × 0.8)
+        Clamped: 0-100
+        
+Output: Weighted Score (0-100) + Total weight breakdown
+
+Example:
+        1 Critical (0.95): 40 × 0.95 = 38
+        2 High (0.85):    25 × 0.85 × 2 = 42.5
+        Total: 80.5 × 0.8 = 64.4
+        Score: 100 - 64.4 = 35.6
+
+═════════════════════════════════════════════════════════════════════════════════
+ALGORITHM 3: RISK LEVEL CATEGORICAL SCORER (Critical/High/Medium/Low/Info)
+═════════════════════════════════════════════════════════════════════════════════
+
+Input:  Finding counts by severity
+        
+Process:
+        Count by Severity
+        [critical=?, high=?, medium=?, low=?]
+              │
+              ▼
+        Apply Thresholds:
+        ┌─ Critical ≥ 1 → CRITICAL 🔴
+        ├─ High ≥ 3 → HIGH 🟠
+        ├─ Medium ≥ 10 → MEDIUM 🟡
+        ├─ Low > 0 → LOW 🟢
+        └─ Else → INFO ⚪
+              │
+              ▼
+        Assign Risk Score (1-10)
+        Provide Reasoning
+        Suggest Color Coding
+        
+Output: Risk Level + Score + Reasoning + Color
+
+Example:
+        1 critical → CRITICAL (10) → "Fix immediately"
+
+═════════════════════════════════════════════════════════════════════════════════
+ALGORITHM 4: CONFIDENCE-WEIGHTED SCORER (0-100)
+═════════════════════════════════════════════════════════════════════════════════
+
+Input:  Findings with confidence, severity
+        
+Process:
+        Calculate Average Confidence
+        [Sum of all confidences / count]
+        Example: (0.98 + 0.85 + 0.65) / 3 = 0.826
+              │
+              ▼
+        Severity to Weight Mapping
+        [Critical: 50, High: 30, Medium: 15, Low: 5]
+              │
+              ▼
+        Calculate Severity Sum
+        [Sum of mapped weights]
+              │
+              ▼
+        Apply Confidence Factor
+        Score = 100 - (Sum × (1 - AvgConfidence))
+        Example: 100 - (95 × (1 - 0.826))
+               = 100 - (95 × 0.174) = 100 - 16.5 = 83.5
+              │
+              ▼
+        Identify Low-Confidence Findings (<0.7)
+        
+Output: Confidence Score (0-100) + Average confidence + Low-conf count
+
+═════════════════════════════════════════════════════════════════════════════════
+ALGORITHM 5: ENTROPY RISK SCORER (0-100 + Distribution)
+═════════════════════════════════════════════════════════════════════════════════
+
+Input:  Findings with file names
+        
+Process:
+        Build File Distribution
+        {
+          "auth.py": 15 findings,
+          "db.py": 2 findings,
+          "utils.py": 3 findings
+        }
+              │
+              ▼
+        Calculate Shannon Entropy
+        entropy = -Σ(p_i × log2(p_i))
+        where p_i = count_i / total
+              │
+              ▼
+        Normalize Entropy
+        [Divide by max_entropy = log2(num_files)]
+        Result: 0-1 (0=concentrated, 1=spread)
+              │
+              ▼
+        Convert to Score (0-100)
+        Classify Concentration:
+        ┌─ High (entropy < 0.3): Concentrated
+        ├─ Medium (0.3-0.7): Moderate
+        └─ Low (entropy > 0.7): Spread
+              │
+              ▼
+        Calculate Risk Reduction Factor
+        [1.0x for concentrated, 0.8x for spread]
+        
+Output: Entropy Score + Concentration Level + Files Affected + Risk Factor
+
+Example:
+        15 findings in 2 files / 20 total
+        Proportion: 0.75 and 0.1
+        Entropy: -(0.75×log2(0.75) + 0.1×log2(0.1)) ≈ 0.82
+        Normalized: 0.82/1.0 = 0.82 → 82 (LOW concentration)
+
+═════════════════════════════════════════════════════════════════════════════════
+ALGORITHM SYNTHESIS: PRIMARY SCORE CALCULATION
+═════════════════════════════════════════════════════════════════════════════════
+
+                         Algorithm Results
+        ┌──────────────────────────────────────────┐
+        │ CVSS: 8.7/10  → 87/100                   │
+        │ Weighted: 38.2/100                       │
+        │ Confidence: 65.3/100                     │
+        └──────────────────────────────────────────┘
+                         │
+                         ▼
+                    Weighted Average
+                    
+        PRIMARY_SCORE = (CVSS × 0.3) + (Weighted × 0.4) + (Confidence × 0.3)
+        
+        = (87 × 0.3) + (38.2 × 0.4) + (65.3 × 0.3)
+        = 26.1 + 15.28 + 19.59
+        = 60.97 → 61.0 / 100
+        
+                         │
+                         ▼
+                    Grade Assignment
+        
+        61.0 → Grade C+ (Poor)
+        
+                         │
+                         ▼
+                    Assessment
+        
+        "Poor - High security risk"
+        
+                         │
+                         ▼
+        ┌─────────────────────────────────────────┐
+        │ FINAL RESULT                            │
+        │ ├─ Score: 61.0/100                      │
+        │ ├─ Grade: C+                            │
+        │ ├─ Risk: HIGH                           │
+        │ └─ Assessment: High security risk       │
+        └─────────────────────────────────────────┘
+
+═════════════════════════════════════════════════════════════════════════════════
+COMPREHENSIVE SCORER: AGGREGATION & RECOMMENDATION ENGINE
+═════════════════════════════════════════════════════════════════════════════════
+
+Input: All findings + Scan metadata
+
+Step 1: Run All 5 Algorithms
+        ├─ CVSSv3InspiredScorer.calculate()
+        ├─ WeightedAggregateScorer.calculate()
+        ├─ RiskLevelScorer.calculate()
+        ├─ ConfidenceWeightedScorer.calculate()
+        └─ EntropyRiskScorer.calculate()
+                         │
+                         ▼
+Step 2: Calculate Primary Score
+        (Weighted average: 30% CVSS + 40% Weighted + 30% Confidence)
+                         │
+                         ▼
+Step 3: Generate Grade
+        Score → Grade (A+ to F)
+                         │
+                         ▼
+Step 4: Create Assessment
+        Generate text description
+                         │
+                         ▼
+Step 5: Generate Recommendations
+        ├─ Critical findings: URGENT actions
+        ├─ High findings: Priority actions
+        ├─ Concentration: Focus guidance
+        ├─ Confidence: Manual review flags
+        └─ Severity distribution: Strategy
+                         │
+                         ▼
+Step 6: Compile Report
+        ├─ Scan summary
+        ├─ Severity distribution
+        ├─ Algorithm results (all 5)
+        ├─ Confidence analysis
+        ├─ Recommendations
+        └─ Detailed breakdown
+                         │
+                         ▼
+        ┌─────────────────────────────────────┐
+        │ COMPREHENSIVE REPORT DELIVERED      │
+        │ Ready for: UI display, API response,│
+        │ Database storage, Recommendations  │
+        └─────────────────────────────────────┘
+
+═════════════════════════════════════════════════════════════════════════════════
+API INTEGRATION FLOW
+═════════════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────┐
+│ POST /api/scanner/upload │
+│ File: vulnerable.py      │
+└────────────┬─────────────┘
+             │
+             ▼
+    ┌────────────────────┐
+    │ Scan & Analyze    │
+    │ Generate Findings │
+    └────────┬───────────┘
+             │
+             ▼
+    ┌────────────────────────────┐
+    │ Comprehensive Scorer       │
+    │ All 5 Algorithms           │
+    └────────┬───────────────────┘
+             │
+             ▼
+    ┌────────────────────────────┐
+    │ Generate Report            │
+    │ Score, Grade, Recs         │
+    └────────┬───────────────────┘
+             │
+             ▼
+    ┌────────────────────────────┐
+    │ Store in Database          │
+    │ security_score, grade      │
+    └────────┬───────────────────┘
+             │
+             ▼
+    ┌────────────────────────────┐
+    │ Return JSON Response       │
+    │ Enhanced with scoring data │
+    └────────┬───────────────────┘
+             │
+             ▼
+    ┌────────────────────────────┐
+    │ Display Results            │
+    │ Grade badge, color coding  │
+    │ Recommendations in UI      │
+    └────────────────────────────┘
+
+Optional:
+    GET /api/scanner/scan/{id}/scoring-breakdown
+           │
+           ▼
+    Return: Complete detailed report
+            (All 5 algorithms + methodology)
+
+═════════════════════════════════════════════════════════════════════════════════
+DATA FLOW DIAGRAM
+═════════════════════════════════════════════════════════════════════════════════
+
+User Code Upload
+       │
+       ├─→ FileHandler (Validate)
+       │         │
+       │         ▼
+       ├─→ CodeScanner (13 Rules)
+       │         │
+       │         ▼
+       ├─→ Regex + AST Analysis
+       │         │
+       │         ▼
+       ├─→ Raw Findings
+       │   ├─ Rule ID
+       │   ├─ Severity
+       │   ├─ Confidence
+       │   ├─ File Name
+       │   └─ Line Number
+       │         │
+       │         ▼
+       ├─→ Confidence Adjustment
+       │   ├─ Context Analysis
+       │   ├─ Multiplier Application
+       │   └─ Confidence Weighting
+       │         │
+       │         ▼
+       ├─→ ComprehensiveScorer
+       │   ├─→ Algorithm 1 (CVSS)
+       │   ├─→ Algorithm 2 (Weighted)
+       │   ├─→ Algorithm 3 (Risk Level)
+       │   ├─→ Algorithm 4 (Confidence)
+       │   ├─→ Algorithm 5 (Entropy)
+       │   │     │
+       │   │     ▼
+       │   └─→ Synthesis
+       │       ├─ Primary Score
+       │       ├─ Grade
+       │       ├─ Assessment
+       │       └─ Recommendations
+       │         │
+       │         ▼
+       └─→ Database Storage
+           ├─ Scan Record
+           │ ├─ security_score
+           │ ├─ security_grade
+           │ └─ timestamp
+           └─ Findings Table
+               ├─ All details
+               ├─ Confidence
+               └─ Context
+
+═════════════════════════════════════════════════════════════════════════════════
+SCORING ALGORITHM SELECTION GUIDE
+═════════════════════════════════════════════════════════════════════════════════
+
+Use Case                              Algorithm           Why
+──────────────────────────────────────────────────────────────────────
+Risk Assessment for Management       Risk Level          Simple, categorical
+Compliance/Standards Proof           CVSS                Industry standard
+Traditional Pass/Fail Grading        Weighted            Intuitive 0-100
+Determining Finding Reliability      Confidence          Shows detection quality
+Prioritizing Remediation Efforts     Entropy             Shows where to focus
+Complete Security Assessment         All Five Together   Comprehensive view
+Severity with Real-World Context     CVSS                Accounts for importance
+Quick Executive Summary              Grade + Risk        Simple, clear
+Technical Deep Dive                  Detailed Report     All algorithms explained
+Verification Workflow                Confidence Data     Know what to trust
+
+═════════════════════════════════════════════════════════════════════════════════
+
+System Version: Password Audit Tool v2.0
+Scoring Version: Comprehensive Multi-Algorithm v1.0
+Status: Production Ready ✅
+Last Updated: October 16, 2026
+
+═════════════════════════════════════════════════════════════════════════════════

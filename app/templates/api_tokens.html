@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}API Tokens — Password Audit Tool{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  <a href="/dashboard">Dashboard</a>
+  <span class="breadcrumb-sep">›</span>
+  <a href="/profile">Profile</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-current">API Tokens</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width:820px;">
+
+  <div class="page-header">
+    <h1 class="page-title">API Tokens</h1>
+    <p class="page-subtitle">Use tokens to authenticate programmatic access without a session cookie.</p>
+  </div>
+
+  <!-- Usage guide -->
+  <div class="alert alert-info mb-2">
+    <div>
+      <strong>How to use</strong><br>
+      Add the header <code style="font-family:var(--mono);font-size:12px;">Authorization: Bearer &lt;token&gt;</code>
+      to any API request. Tokens carry the same permissions as your account.
+    </div>
+  </div>
+
+  <!-- Create token card -->
+  <div class="card mb-2">
+    <div class="card-header"><span class="card-title">Create New Token</span></div>
+    <form id="createForm" style="display:grid;grid-template-columns:1fr 140px auto;gap:12px;align-items:end;">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="tokenName">Token Name</label>
+        <input class="form-control" id="tokenName" placeholder="e.g. CI Pipeline, Dev Machine" maxlength="80" required>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="tokenExpiry">Expires In</label>
+        <select class="form-control" id="tokenExpiry">
+          <option value="30">30 days</option>
+          <option value="90" selected>90 days</option>
+          <option value="180">180 days</option>
+          <option value="365">1 year</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-bottom:0;">Generate</button>
+    </form>
+  </div>
+
+  <!-- New token reveal box (shown once) -->
+  <div id="newTokenBox" class="card mb-2 hidden" style="border-color:var(--success);">
+    <div class="card-header">
+      <span class="card-title" style="color:var(--success);">✓ Token Created</span>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">
+      Copy this token now. <strong>It will not be shown again.</strong>
+    </p>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <code id="tokenValue" style="
+        flex:1;padding:10px 14px;
+        background:var(--surface2);border:1px solid var(--border);
+        border-radius:var(--radius);font-family:var(--mono);font-size:13px;
+        word-break:break-all;color:var(--text);"></code>
+      <button class="btn btn-ghost btn-sm" onclick="copyToken()">Copy</button>
+    </div>
+  </div>
+
+  <!-- Existing tokens list -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Active Tokens</span>
+      <span id="tokenCount" style="font-size:13px;color:var(--text3);"></span>
+    </div>
+    <div id="tokenList"><div class="spinner"></div></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── load tokens ─────────────────────────────────────────────────────── */
+async function loadTokens() {
+  try {
+    const { tokens, count } = await apiFetch('/v2/tokens');
+    document.getElementById('tokenCount').textContent = `${count} token${count !== 1 ? 's' : ''}`;
+    renderTokens(tokens);
+  } catch(e) {
+    showAlert('Failed to load tokens.', 'error');
+  }
+}
+
+function renderTokens(tokens) {
+  const el = document.getElementById('tokenList');
+  if (!tokens.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔑</div>
+        <div class="empty-title">No tokens yet</div>
+        <div class="empty-desc">Create a token above to get started.</div>
+      </div>`;
+    return;
+  }
+
+  const now = new Date();
+  const rows = tokens.map(t => {
+    const created   = new Date(t.created_at).toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'});
+    const expiresAt = new Date(t.expires_at);
+    const expired   = expiresAt < now;
+    const daysLeft  = Math.max(0, Math.ceil((expiresAt - now) / 86_400_000));
+    const expiryLabel = expired
+      ? `<span style="color:var(--danger);font-size:12px;">Expired</span>`
+      : `<span style="color:${daysLeft < 14 ? 'var(--warning)' : 'var(--success)'};font-size:12px;">${daysLeft}d left</span>`;
+    const lastUsed = t.last_used_at
+      ? new Date(t.last_used_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
+      : '<span style="color:var(--text3)">Never</span>';
+
+    return `<tr>
+      <td><strong>${escapeHtml(t.name || '(unnamed)')}</strong></td>
+      <td style="font-size:12px;color:var(--text3);">${created}</td>
+      <td>${expiryLabel}</td>
+      <td style="font-size:12px;">${lastUsed}</td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="revokeToken(${t.id}, this)">Revoke</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr>
+          <th>Name</th><th>Created</th><th>Expires</th><th>Last Used</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+/* ── create token ────────────────────────────────────────────────────── */
+document.getElementById('createForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name    = document.getElementById('tokenName').value.trim();
+  const expires = parseInt(document.getElementById('tokenExpiry').value, 10);
+  if (!name) return;
+
+  try {
+    const { token } = await apiFetch('/v2/tokens/create', {
+      method: 'POST',
+      body: JSON.stringify({ name, expires_in_days: expires }),
+    });
+
+    // Reveal token
+    document.getElementById('tokenValue').textContent = token;
+    document.getElementById('newTokenBox').classList.remove('hidden');
+    document.getElementById('newTokenBox').scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+    // Reset form and reload list
+    e.target.reset();
+    loadTokens();
+  } catch(e) {
+    showAlert(e.message || 'Failed to create token.', 'error');
+  }
+});
+
+/* ── copy token ──────────────────────────────────────────────────────── */
+async function copyToken() {
+  const val = document.getElementById('tokenValue').textContent;
+  try {
+    await navigator.clipboard.writeText(val);
+    showAlert('Token copied to clipboard!', 'success');
+  } catch {
+    showAlert('Copy failed — select and copy manually.', 'warning');
+  }
+}
+
+/* ── revoke token ────────────────────────────────────────────────────── */
+async function revokeToken(id, btn) {
+  if (!confirm('Revoke this token? It will stop working immediately.')) return;
+  btn.disabled = true;
+  try {
+    await apiFetch(`/v2/tokens/${id}`, { method:'DELETE' });
+    showAlert('Token revoked.', 'success');
+    loadTokens();
+  } catch(e) {
+    btn.disabled = false;
+    showAlert(e.message, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadTokens);
+</script>
+{% endblock %}

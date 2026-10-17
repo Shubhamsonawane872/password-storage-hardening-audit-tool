@@ -1,0 +1,17 @@
+{% extends "errors/_base_error.html" %}
+
+{% block err_title %}403 Forbidden{% endblock %}
+{% block err_grad %}#ef4444, #dc2626{% endblock %}
+{% block err_code %}403{% endblock %}
+{% block err_title_text %}Access Denied{% endblock %}
+{% block err_desc %}
+  You don't have permission to view this page. If you believe this is a mistake,
+  contact your administrator.
+{% endblock %}
+{% block err_actions %}
+  <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+  <a href="/"          class="btn btn-ghost">Home</a>
+{% endblock %}
+{% block err_hint %}
+  HTTP 403 — your account doesn't have the required role for this resource.
+{% endblock %}

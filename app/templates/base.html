@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Password Audit Tool{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────────────── -->
+<nav class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+
+    <a href="/" class="nav-brand" aria-label="Home">
+      <span class="brand-icon">🔐</span>
+      <span class="brand-text">Password<strong>Audit</strong></span>
+    </a>
+
+    <!-- Desktop links -->
+    <div class="nav-links" id="navLinks">
+      {% if current_user %}
+        <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </a>
+        <a href="/scan" class="nav-link {% if request.path == '/scan' %}active{% endif %}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          New Scan
+        </a>
+        <a href="/history" class="nav-link {% if request.path == '/history' %}active{% endif %}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4.5"/><polyline points="3 2 3 8 9 8"/></svg>
+          History
+        </a>
+        {% if current_user.role == 'admin' %}
+        <a href="/admin" class="nav-link nav-link-admin {% if request.path == '/admin' %}active{% endif %}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Admin
+        </a>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- Right side controls -->
+    <div class="nav-controls">
+      <!-- Dark-mode toggle -->
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+
+      {% if current_user %}
+      <!-- User dropdown -->
+      <div class="user-menu" id="userMenu">
+        <button class="user-btn" id="userBtn" aria-haspopup="true" aria-expanded="false">
+          <span class="user-avatar">{{ current_user.name[0].upper() }}</span>
+          <span class="user-name">{{ current_user.name }}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown" id="userDropdown" role="menu">
+          <div class="dropdown-header">
+            <div class="dropdown-name">{{ current_user.name }}</div>
+            <div class="dropdown-email">{{ current_user.email }}</div>
+            <span class="dropdown-badge role-{{ current_user.role }}">{{ current_user.role }}</span>
+          </div>
+          <div class="dropdown-divider"></div>
+          <a href="/profile" class="dropdown-item" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Profile &amp; Settings
+          </a>
+          <a href="/api-tokens" class="dropdown-item" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            API Tokens
+          </a>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item dropdown-item-danger" onclick="logout()" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sign Out
+          </button>
+        </div>
+      </div>
+      {% else %}
+      <a href="/login"    class="btn btn-ghost btn-sm">Sign In</a>
+      <a href="/register" class="btn btn-primary btn-sm">Register</a>
+      {% endif %}
+
+      <!-- Hamburger (mobile) -->
+      <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+  </div><!-- /nav-inner -->
+</nav>
+
+<!-- ── Breadcrumb ─────────────────────────────────────────────────────────── -->
+{% block breadcrumb %}{% endblock %}
+
+<!-- ── Flash messages ─────────────────────────────────────────────────────── -->
+<div id="flashContainer" role="status" aria-live="polite">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">
+        {{ message }}
+        <button class="flash-close" onclick="this.parentElement.remove()" aria-label="Dismiss">×</button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+</div>
+
+<!-- ── Page content ───────────────────────────────────────────────────────── -->
+<main id="main-content">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span>🔐 Password Audit Tool — static analysis only, not a guarantee of security.</span>
+    <span class="footer-links">
+      <a href="/scan">New Scan</a>
+      <a href="/history">History</a>
+      {% if current_user and current_user.role == 'admin' %}<a href="/admin">Admin</a>{% endif %}
+    </span>
+  </div>
+</footer>
+
+<!-- ── Scripts ────────────────────────────────────────────────────────────── -->
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script>
+/* ── Dark-mode ──────────────────────────────────────────────────────────── */
+(function () {
+  const html = document.documentElement;
+  const btn  = document.getElementById('themeToggle');
+  const key  = 'audit-theme';
+
+  function applyTheme(t) {
+    html.dataset.theme = t;
+    localStorage.setItem(key, t);
+  }
+
+  // On load: honour saved pref or system pref
+  const saved  = localStorage.getItem(key);
+  const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  applyTheme(saved || prefers);
+
+  btn.addEventListener('click', () => {
+    applyTheme(html.dataset.theme === 'dark' ? 'light' : 'dark');
+  });
+})();
+
+/* ── User dropdown ──────────────────────────────────────────────────────── */
+(function () {
+  const btn      = document.getElementById('userBtn');
+  const dropdown = document.getElementById('userDropdown');
+  if (!btn) return;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = dropdown.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open);
+  });
+  document.addEventListener('click', () => {
+    dropdown.classList.remove('open');
+    btn.setAttribute('aria-expanded', false);
+  });
+})();
+
+/* ── Mobile hamburger ───────────────────────────────────────────────────── */
+(function () {
+  const ham   = document.getElementById('hamburger');
+  const links = document.getElementById('navLinks');
+  if (!ham) return;
+  ham.addEventListener('click', () => {
+    const open = links.classList.toggle('open');
+    ham.classList.toggle('open', open);
+    ham.setAttribute('aria-expanded', open);
+  });
+})();
+
+/* ── Auto-dismiss flash after 6s ────────────────────────────────────────── */
+document.querySelectorAll('.flash').forEach(el => {
+  setTimeout(() => el.remove(), 6000);
+});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

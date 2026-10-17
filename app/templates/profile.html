@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Profile & Settings — Password Audit Tool{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  <a href="/dashboard">Dashboard</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-current">Profile & Settings</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width:860px;">
+
+  <div class="page-header">
+    <h1 class="page-title">Profile &amp; Settings</h1>
+    <p class="page-subtitle">Manage your account details and preferences</p>
+  </div>
+
+  <div id="profileAlert"></div>
+
+  <div class="grid grid-2" style="align-items:start;">
+
+    <!-- ── Left column ──────────────────────────────────────────────── -->
+    <div>
+
+      <!-- Profile info -->
+      <div class="card mb-2">
+        <div class="card-header"><span class="card-title">Account Information</span></div>
+
+        <!-- Avatar -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+          <div id="avatarCircle" style="
+            width:64px;height:64px;border-radius:50%;
+            background:var(--primary);color:#fff;
+            display:flex;align-items:center;justify-content:center;
+            font-size:26px;font-weight:700;flex-shrink:0;"></div>
+          <div>
+            <div id="profileName" style="font-size:18px;font-weight:700;"></div>
+            <div id="profileEmail" style="font-size:13px;color:var(--text3);margin-top:2px;"></div>
+            <span id="profileRole" class="badge mt-1"></span>
+          </div>
+        </div>
+
+        <form id="profileForm">
+          <div class="form-group">
+            <label class="form-label" for="inputName">Full Name</label>
+            <input class="form-control" id="inputName" type="text" maxlength="100" required>
+            <span class="form-error" id="nameErr"></span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input class="form-control" id="inputEmail" type="email" disabled
+                   style="opacity:.6;cursor:not-allowed;">
+            <span class="form-hint">Email cannot be changed.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Member Since</label>
+            <input class="form-control" id="inputCreated" type="text" disabled
+                   style="opacity:.6;cursor:not-allowed;">
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">Save Changes</button>
+        </form>
+      </div>
+
+      <!-- Change password -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Change Password</span></div>
+        <form id="passwordForm">
+          <div class="form-group">
+            <label class="form-label" for="curPw">Current Password</label>
+            <input class="form-control" id="curPw" type="password" autocomplete="current-password" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="newPw">New Password</label>
+            <input class="form-control" id="newPw" type="password" autocomplete="new-password" required>
+            <!-- Requirements -->
+            <ul id="pwReqs" style="list-style:none;padding:8px 0 0;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:2px;">
+              <li id="req-len">✗ 8+ characters</li>
+              <li id="req-up"> ✗ Uppercase</li>
+              <li id="req-low">✗ Lowercase</li>
+              <li id="req-dig">✗ Digit</li>
+              <li id="req-sym">✗ Special char</li>
+            </ul>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="conPw">Confirm New Password</label>
+            <input class="form-control" id="conPw" type="password" autocomplete="new-password" required>
+            <span class="form-error" id="pwMatchErr"></span>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">Update Password</button>
+        </form>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- ── Right column ─────────────────────────────────────────────── -->
+    <div>
+
+      <!-- Preferences -->
+      <div class="card mb-2">
+        <div class="card-header"><span class="card-title">Preferences</span></div>
+        <form id="settingsForm">
+
+          <div class="form-group">
+            <label class="form-label" for="themeSelect">Interface Theme</label>
+            <select class="form-control" id="themeSelect">
+              <option value="light">☀️  Light</option>
+              <option value="dark">🌙  Dark</option>
+            </select>
+            <span class="form-hint">Synced with the toggle in the navbar.</span>
+          </div>
+
+          <div class="form-group" style="display:flex;align-items:center;gap:12px;">
+            <input type="checkbox" id="notifyEmail" style="width:16px;height:16px;cursor:pointer;">
+            <div>
+              <label for="notifyEmail" class="form-label" style="margin:0;cursor:pointer;">Email Notifications</label>
+              <span class="form-hint">Receive a summary when a scheduled scan completes.</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full">Save Preferences</button>
+        </form>
+      </div>
+
+      <!-- Danger zone -->
+      <div class="card" style="border-color:var(--danger);">
+        <div class="card-header">
+          <span class="card-title" style="color:var(--danger);">Danger Zone</span>
+        </div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">
+          Deleting your account is permanent and cannot be undone. All your scans and findings will be removed.
+        </p>
+        <button class="btn btn-danger btn-full" onclick="confirmDeleteAccount()">
+          Delete My Account
+        </button>
+      </div>
+
+    </div><!-- /right -->
+  </div>
+
+</div>
+
+<!-- Confirm delete modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <div class="modal-title">⚠️ Delete Account</div>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:16px;">
+      This action is <strong>irreversible</strong>. Type <code>DELETE</code> to confirm.
+    </p>
+    <input class="form-control" id="deleteConfirmInput" placeholder="Type DELETE" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="deleteConfirmBtn" disabled onclick="deleteAccount()">
+        Delete Account
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _profile = null;
+
+/* ── load ────────────────────────────────────────────────────────────── */
+async function loadProfile() {
+  try {
+    const { user } = await apiFetch('/profile');
+    _profile = user;
+
+    document.getElementById('avatarCircle').textContent = (user.name || '?')[0].toUpperCase();
+    document.getElementById('profileName').textContent  = user.name;
+    document.getElementById('profileEmail').textContent = user.email;
+    const roleBadge = document.getElementById('profileRole');
+    roleBadge.textContent  = user.role;
+    roleBadge.className    = `badge role-${user.role}`;
+
+    document.getElementById('inputName').value    = user.name;
+    document.getElementById('inputEmail').value   = user.email;
+    document.getElementById('inputCreated').value = new Date(user.created_at).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+
+    // Preferences
+    const themeSelect = document.getElementById('themeSelect');
+    themeSelect.value = user.theme || document.documentElement.dataset.theme || 'light';
+    document.getElementById('notifyEmail').checked = Boolean(user.notify_email);
+
+  } catch(e) {
+    showAlert('Failed to load profile.', 'error');
+  }
+}
+
+/* ── profile form ────────────────────────────────────────────────────── */
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('inputName').value.trim();
+  document.getElementById('nameErr').textContent = '';
+  try {
+    await apiFetch('/profile/update', { method:'POST', body: JSON.stringify({ name }) });
+    showAlert('Profile updated!', 'success');
+    document.getElementById('profileName').textContent  = name;
+    document.getElementById('avatarCircle').textContent = name[0].toUpperCase();
+  } catch(e) {
+    document.getElementById('nameErr').textContent = e.message;
+  }
+});
+
+/* ── password live requirements ──────────────────────────────────────── */
+document.getElementById('newPw').addEventListener('input', function() {
+  const p = this.value;
+  const mark = (id, ok) => {
+    const el = document.getElementById(id);
+    el.textContent = (ok ? '✓ ' : '✗ ') + el.textContent.slice(2);
+    el.style.color = ok ? 'var(--success)' : 'var(--text3)';
+  };
+  mark('req-len', p.length >= 8);
+  mark('req-up',  /[A-Z]/.test(p));
+  mark('req-low', /[a-z]/.test(p));
+  mark('req-dig', /\d/.test(p));
+  mark('req-sym', /[!@#$%^&*()_+\-=\[\]{};:"\\|,.<>?/`~']/.test(p));
+});
+
+/* ── password form ───────────────────────────────────────────────────── */
+document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const cur = document.getElementById('curPw').value;
+  const nw  = document.getElementById('newPw').value;
+  const con = document.getElementById('conPw').value;
+
+  if (nw !== con) {
+    document.getElementById('pwMatchErr').textContent = 'Passwords do not match';
+    return;
+  }
+  document.getElementById('pwMatchErr').textContent = '';
+  try {
+    await apiFetch('/profile/change-password', {
+      method:'POST',
+      body: JSON.stringify({ current_password: cur, new_password: nw, confirm_password: con }),
+    });
+    showAlert('Password changed! Please log in again.', 'success');
+    document.getElementById('passwordForm').reset();
+  } catch(e) {
+    showAlert(e.message, 'error');
+  }
+});
+
+/* ── settings form ───────────────────────────────────────────────────── */
+document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const theme       = document.getElementById('themeSelect').value;
+  const notifyEmail = document.getElementById('notifyEmail').checked;
+  try {
+    await apiFetch('/profile/settings', { method:'POST', body: JSON.stringify({ theme, notify_email: notifyEmail }) });
+    // Apply theme immediately
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('audit-theme', theme);
+    showAlert('Preferences saved!', 'success');
+  } catch(e) {
+    showAlert(e.message, 'error');
+  }
+});
+
+// Keep theme select in sync with navbar toggle
+const obs = new MutationObserver(() => {
+  const sel = document.getElementById('themeSelect');
+  if (sel) sel.value = document.documentElement.dataset.theme;
+});
+obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* ── delete account ──────────────────────────────────────────────────── */
+function confirmDeleteAccount() {
+  document.getElementById('deleteModal').classList.add('open');
+  document.getElementById('deleteConfirmInput').value = '';
+  document.getElementById('deleteConfirmBtn').disabled = true;
+}
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('open');
+}
+document.getElementById('deleteConfirmInput').addEventListener('input', function() {
+  document.getElementById('deleteConfirmBtn').disabled = this.value !== 'DELETE';
+});
+async function deleteAccount() {
+  try {
+    await apiFetch('/profile/delete', { method:'DELETE' });
+    window.location.href = '/';
+  } catch(e) {
+    showAlert(e.message, 'error');
+    closeDeleteModal();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
+{% endblock %}

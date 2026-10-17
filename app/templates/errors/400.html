@@ -1,0 +1,17 @@
+{% extends "errors/_base_error.html" %}
+
+{% block err_title %}400 Bad Request{% endblock %}
+{% block err_grad %}#f59e0b, #ea580c{% endblock %}
+{% block err_code %}400{% endblock %}
+{% block err_title_text %}Bad Request{% endblock %}
+{% block err_desc %}
+  The server couldn't understand your request. This usually means something was
+  missing or malformed — check your input and try again.
+{% endblock %}
+{% block err_actions %}
+  <a href="javascript:history.back()" class="btn btn-primary">← Go Back</a>
+  <a href="/dashboard"                class="btn btn-ghost">Dashboard</a>
+{% endblock %}
+{% block err_hint %}
+  HTTP 400 — the request could not be processed as sent.
+{% endblock %}

@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% block title %}Scan History — Password Audit Tool{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  <a href="/dashboard">Dashboard</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-current">Scan History</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+  <div class="page-header flex items-center justify-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title">Scan History</h1>
+      <p class="page-subtitle">All your past security audits</p>
+    </div>
+    <a href="/scan" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Scan
+    </a>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters mb-2">
+    <input  class="form-control" id="filterSearch"
+            placeholder="Search filename…" oninput="applyFilters()">
+
+    <select class="form-control" id="filterStatus" onchange="applyFilters()">
+      <option value="">All Statuses</option>
+      <option value="completed">Completed</option>
+      <option value="failed">Failed</option>
+      <option value="in_progress">In Progress</option>
+    </select>
+
+    <select class="form-control" id="filterRule" onchange="applyFilters()">
+      <option value="">All Rules</option>
+    </select>
+
+    <select class="form-control" id="filterSeverity" onchange="applyFilters()">
+      <option value="">All Severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+      <option value="info">Info</option>
+    </select>
+
+    <select class="form-control" id="filterPerPage" onchange="changePerPage()">
+      <option value="10">10 / page</option>
+      <option value="20" selected>20 / page</option>
+      <option value="50">50 / page</option>
+    </select>
+
+    <button class="btn btn-ghost btn-sm" onclick="resetFilters()">Clear</button>
+  </div>
+
+  <!-- Results summary -->
+  <div id="resultSummary" style="font-size:13px;color:var(--text3);margin-bottom:12px;"></div>
+
+  <!-- Table -->
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div id="historyTable">
+      <div class="spinner" style="margin:40px auto;"></div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div id="paginationBar" class="pagination"></div>
+
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <div class="modal-title">Delete Scan?</div>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:8px;">
+      This will permanently remove the scan and all its findings.
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost"  onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   Scan History — paginated, filterable, rule-dropdown populated from
+   the /api/scanner/rules endpoint.
+══════════════════════════════════════════════════════════════════════ */
+
+let _allScans   = [];   // full list fetched once
+let _filtered   = [];   // after client-side filter
+let _page       = 1;
+let _perPage    = 20;
+let _pendingDel = null;
+
+// ── Boot ──────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadRules(), loadScans()]);
+}
+
+// ── Load rule dropdown ────────────────────────────────────────────────
+async function loadRules() {
+  try {
+    const { rules } = await apiFetch('/scanner/rules');
+    const sel = document.getElementById('filterRule');
+    Object.entries(rules).forEach(([id, rule]) => {
+      const opt = document.createElement('option');
+      opt.value       = id;
+      opt.textContent = `${id} — ${rule.title}`;
+      sel.appendChild(opt);
+    });
+  } catch { /* non-fatal */ }
+}
+
+// ── Load all scans (paginated from API) ───────────────────────────────
+async function loadScans() {
+  try {
+    // Fetch up to 500 so client-side filtering works smoothly.
+    // For very large datasets, switch to server-side filtering.
+    const { scans } = await apiFetch('/scanner/scans?per_page=500');
+    _allScans = scans;
+    applyFilters();
+  } catch(e) {
+    document.getElementById('historyTable').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div>
+       <div class="empty-title">Failed to load scans</div>
+       <div class="empty-desc">${escapeHtml(e.message)}</div></div>`;
+  }
+}
+
+// ── Filters ───────────────────────────────────────────────────────────
+function applyFilters() {
+  const search   = document.getElementById('filterSearch').value.toLowerCase();
+  const status   = document.getElementById('filterStatus').value;
+  const ruleId   = document.getElementById('filterRule').value;
+  const severity = document.getElementById('filterSeverity').value;
+
+  _filtered = _allScans.filter(s => {
+    if (search && !(s.original_filename || '').toLowerCase().includes(search)) return false;
+    if (status && s.scan_status !== status) return false;
+    // severity / rule filter: only feasible if we stored aggregated counts or tags
+    // For now severity maps to presence of counts
+    if (severity === 'critical' && !(s.critical_count > 0)) return false;
+    if (severity === 'high'     && !(s.high_count     > 0)) return false;
+    if (severity === 'medium'   && !(s.medium_count   > 0)) return false;
+    if (severity === 'low'      && !(s.low_count      > 0)) return false;
+    return true;
+  });
+
+  _page = 1;
+  document.getElementById('resultSummary').textContent =
+    `Showing ${_filtered.length} of ${_allScans.length} scan${_allScans.length !== 1 ? 's' : ''}`;
+  renderPage();
+}
+
+function resetFilters() {
+  ['filterSearch','filterStatus','filterRule','filterSeverity'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+  });
+  applyFilters();
+}
+
+function changePerPage() {
+  _perPage = parseInt(document.getElementById('filterPerPage').value, 10);
+  _page = 1;
+  renderPage();
+}
+
+// ── Render current page ───────────────────────────────────────────────
+function renderPage() {
+  const start  = (_page - 1) * _perPage;
+  const slice  = _filtered.slice(start, start + _perPage);
+  const total  = _filtered.length;
+  const pages  = Math.max(1, Math.ceil(total / _perPage));
+
+  renderTable(slice);
+  renderPagination(pages);
+}
+
+function renderTable(scans) {
+  const el = document.getElementById('historyTable');
+
+  if (!scans.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">No scans match your filters</div>
+        <div class="empty-desc">Try clearing filters or <a href="/scan">starting a new scan</a>.</div>
+      </div>`;
+    return;
+  }
+
+  const rows = scans.map(s => {
+    const date = new Date(s.created_at).toLocaleDateString(undefined,
+      { month:'short', day:'numeric', year:'numeric' });
+
+    const grade = s.security_grade
+      ? `<span class="grade-badge grade-${s.security_grade.replace('+','\\+')}"
+              style="width:26px;height:26px;font-size:12px;">${s.security_grade}</span>`
+      : '<span style="color:var(--text3);">—</span>';
+
+    const critBadge = s.critical_count > 0
+      ? `<span class="badge badge-critical">${s.critical_count}</span>` : '—';
+    const highBadge = s.high_count > 0
+      ? `<span class="badge badge-high">${s.high_count}</span>` : '—';
+
+    return `<tr>
+      <td>
+        <a href="/scan/${s.id}" style="font-weight:600;color:var(--primary);">
+          ${escapeHtml(s.original_filename || '(unnamed)')}
+        </a>
+      </td>
+      <td><span class="badge badge-${s.scan_status}">${s.scan_status}</span></td>
+      <td style="text-align:center;">${s.total_files_scanned ?? 0}</td>
+      <td style="text-align:center;font-weight:600;">${s.total_findings ?? 0}</td>
+      <td style="text-align:center;">${critBadge}</td>
+      <td style="text-align:center;">${highBadge}</td>
+      <td style="text-align:center;">${grade}</td>
+      <td style="font-size:12px;color:var(--text3);white-space:nowrap;">${date}</td>
+      <td>
+        <div class="flex gap-2">
+          <a href="/scan/${s.id}" class="btn btn-ghost btn-sm">View</a>
+          <button class="btn btn-danger btn-sm" onclick="askDelete(${s.id})">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="table-wrap" style="border:none;border-radius:0;">
+      <table class="data-table">
+        <thead><tr>
+          <th>Filename</th>
+          <th>Status</th>
+          <th style="text-align:center;">Files</th>
+          <th style="text-align:center;">Findings</th>
+          <th style="text-align:center;">Critical</th>
+          <th style="text-align:center;">High</th>
+          <th style="text-align:center;">Grade</th>
+          <th>Date</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Pagination bar ────────────────────────────────────────────────────
+function renderPagination(pages) {
+  const bar = document.getElementById('paginationBar');
+  if (pages <= 1) { bar.innerHTML = ''; return; }
+
+  const MAX_BTNS = 7;
+  let buttons = '';
+
+  // Prev
+  buttons += `<button class="page-btn" onclick="goPage(${_page - 1})"
+    ${_page === 1 ? 'disabled' : ''} aria-label="Previous">‹</button>`;
+
+  // Page numbers with ellipsis
+  const range = buildPageRange(_page, pages, MAX_BTNS);
+  let prev = null;
+  for (const n of range) {
+    if (prev !== null && n - prev > 1) {
+      buttons += `<span class="page-btn" style="cursor:default;border:none;">…</span>`;
+    }
+    buttons += `<button class="page-btn ${n === _page ? 'active' : ''}"
+      onclick="goPage(${n})" aria-label="Page ${n}" aria-current="${n === _page ? 'page' : false}">
+      ${n}</button>`;
+    prev = n;
+  }
+
+  // Next
+  buttons += `<button class="page-btn" onclick="goPage(${_page + 1})"
+    ${_page === pages ? 'disabled' : ''} aria-label="Next">›</button>`;
+
+  bar.innerHTML = buttons;
+}
+
+function buildPageRange(current, total, max) {
+  if (total <= max) return Array.from({ length: total }, (_, i) => i + 1);
+  const half = Math.floor(max / 2);
+  let start = Math.max(1, current - half);
+  let end   = Math.min(total, start + max - 1);
+  if (end - start < max - 1) start = Math.max(1, end - max + 1);
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
+function goPage(n) {
+  const pages = Math.max(1, Math.ceil(_filtered.length / _perPage));
+  _page = Math.max(1, Math.min(n, pages));
+  renderPage();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Delete ────────────────────────────────────────────────────────────
+function askDelete(scanId) {
+  _pendingDel = scanId;
+  document.getElementById('deleteModal').classList.add('open');
+  document.getElementById('confirmDeleteBtn').onclick = () => doDelete(scanId);
+}
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('open');
+  _pendingDel = null;
+}
+async function doDelete(scanId) {
+  try {
+    await apiFetch(`/scanner/scan/${scanId}`, { method:'DELETE' });
+    closeDeleteModal();
+    _allScans = _allScans.filter(s => s.id !== scanId);
+    showAlert('Scan deleted.', 'success');
+    applyFilters();
+  } catch(e) {
+    showAlert(e.message, 'error');
+    closeDeleteModal();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

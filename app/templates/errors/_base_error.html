@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block err_title %}Error{% endblock %} — Password Audit Tool</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Standalone error page — no dependency on base.html */
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      font-family: var(--font);
+      color: var(--text);
+      padding: 24px;
+      text-align: center;
+    }
+
+    .err-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 56px 48px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .err-code {
+      font-size: 88px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -.04em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, {% block err_grad %}#5b6cf9, #764ba2{% endblock %});
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .err-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .err-desc {
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.65;
+      margin-bottom: 32px;
+    }
+
+    .err-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .err-hint {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text3);
+    }
+
+    @media (max-width: 480px) {
+      .err-card  { padding: 36px 24px; }
+      .err-code  { font-size: 64px; }
+      .err-title { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Persist dark mode on error pages too -->
+  <script>
+    const t = localStorage.getItem('audit-theme') ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.dataset.theme = t;
+  </script>
+
+  <a href="/" style="
+    position:fixed;top:20px;left:24px;
+    font-size:13px;font-weight:600;color:var(--primary);
+    display:flex;align-items:center;gap:6px;text-decoration:none;">
+    🔐 Password<strong>Audit</strong>
+  </a>
+
+  <div class="err-card">
+    <div class="err-code">{% block err_code %}{% endblock %}</div>
+    <div class="err-title">{% block err_title_text %}Something went wrong{% endblock %}</div>
+    <p class="err-desc">{% block err_desc %}{% endblock %}</p>
+
+    <div class="err-actions">
+      {% block err_actions %}
+      <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+      <a href="/"          class="btn btn-ghost">Home</a>
+      {% endblock %}
+    </div>
+
+    <div class="err-hint">
+      {% block err_hint %}
+      If this keeps happening, contact your system administrator.
+      {% endblock %}
+    </div>
+  </div>
+</body>
+</html>

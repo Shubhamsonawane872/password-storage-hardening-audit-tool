@@ -1,0 +1,56 @@
+/* Responsive overrides — mobile-first breakpoints */
+
+@media (max-width: 900px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .stat-number { font-size: 24px; }
+}
+
+@media (max-width: 768px) {
+  .hamburger { display: flex; }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: var(--nav-h);
+    left: 0; right: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    padding: 12px;
+    gap: 4px;
+    box-shadow: var(--shadow);
+    z-index: 190;
+  }
+  .nav-links.open { display: flex; }
+  .nav-link { width: 100%; }
+
+  .user-name { display: none; }
+
+  .page-container { padding: 20px 16px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+
+  .filters { flex-direction: column; }
+  .filters .form-control { max-width: 100%; }
+
+  .card { padding: 16px; }
+  .modal { padding: 20px; }
+
+  .drop-zone { padding: 32px 16px; }
+
+  .footer-inner { flex-direction: column; align-items: flex-start; }
+  .footer-links { flex-wrap: wrap; gap: 10px; }
+
+  .data-table th, .data-table td { padding: 9px 10px; font-size: 13px; }
+
+  #flashContainer { padding: 0 16px; }
+}
+
+@media (max-width: 480px) {
+  .nav-brand .brand-text { font-size: 15px; }
+  .page-title { font-size: 20px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-number { font-size: 22px; }
+  .btn { padding: 8px 14px; font-size: 13px; }
+  .pagination { gap: 2px; }
+  .page-btn { min-width: 32px; height: 32px; font-size: 12px; }
+}

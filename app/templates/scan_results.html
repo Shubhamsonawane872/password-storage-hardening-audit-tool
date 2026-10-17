@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}Scan Results — Password Audit Tool{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  <a href="/dashboard">Dashboard</a>
+  <span class="breadcrumb-sep">›</span>
+  <a href="/history">History</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-current">Scan Results</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+  <!-- Header row -->
+  <div class="page-header flex items-center justify-between flex-wrap gap-2">
+    <div>
+      <h1 class="page-title" id="scanFilename">Loading…</h1>
+      <p class="page-subtitle" id="scanMeta"></p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <div class="flex gap-2" id="exportBtns">
+        <button class="btn btn-ghost btn-sm" onclick="exportFmt('json')">⬇ JSON</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportFmt('html')">⬇ HTML</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportFmt('csv')">⬇ CSV</button>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="askDelete()">🗑 Delete</button>
+      <a href="/history" class="btn btn-ghost btn-sm">← History</a>
+    </div>
+  </div>
+
+  <!-- Score + stat row -->
+  <div class="stat-grid mb-3" id="statRow">
+    <div class="stat-box stat-primary">
+      <span class="stat-label">Files Scanned</span>
+      <span class="stat-number" id="stFiles">—</span>
+    </div>
+    <div class="stat-box" id="scoreBox">
+      <span class="stat-label">Security Score</span>
+      <div class="flex items-center gap-2" style="margin-top:4px;">
+        <span class="stat-number" id="stScore">—</span>
+        <span class="grade-badge" id="stGrade" style="width:34px;height:34px;font-size:15px;">—</span>
+      </div>
+    </div>
+    <div class="stat-box stat-critical">
+      <span class="stat-label">Critical</span>
+      <span class="stat-number" id="stCrit">—</span>
+    </div>
+    <div class="stat-box stat-high">
+      <span class="stat-label">High</span>
+      <span class="stat-number" id="stHigh">—</span>
+    </div>
+    <div class="stat-box stat-medium">
+      <span class="stat-label">Medium</span>
+      <span class="stat-number" id="stMed">—</span>
+    </div>
+    <div class="stat-box stat-low">
+      <span class="stat-label">Low / Info</span>
+      <span class="stat-number" id="stLow">—</span>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters mb-2">
+    <input  class="form-control" id="filterSearch"
+            placeholder="Search rule, file, description…" oninput="applyFilters()">
+
+    <select class="form-control" id="filterSev" onchange="applyFilters()">
+      <option value="">All Severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+      <option value="info">Info</option>
+    </select>
+
+    <select class="form-control" id="filterRule" onchange="applyFilters()">
+      <option value="">All Rules</option>
+    </select>
+
+    <select class="form-control" id="filterConf" onchange="applyFilters()">
+      <option value="0">Any Confidence</option>
+      <option value="0.5">≥ 50%</option>
+      <option value="0.7">≥ 70%</option>
+      <option value="0.9">≥ 90%</option>
+    </select>
+
+    <select class="form-control" id="filterPerPage" onchange="changePerPage()">
+      <option value="20" selected>20 / page</option>
+      <option value="50">50 / page</option>
+      <option value="100">100 / page</option>
+    </select>
+
+    <button class="btn btn-ghost btn-sm" onclick="resetFilters()">Clear</button>
+  </div>
+
+  <div id="filterSummary" style="font-size:13px;color:var(--text3);margin-bottom:12px;"></div>
+
+  <!-- Findings list -->
+  <div id="findingsList"></div>
+
+  <!-- Pagination -->
+  <div id="paginationBar" class="pagination"></div>
+
+</div>
+
+<!-- Delete modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <div class="modal-title">Delete This Scan?</div>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:8px;">
+      All findings associated with this scan will be permanently deleted.
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="doDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   Scan Results — paginated, filterable, with confidence bars
+══════════════════════════════════════════════════════════════════════ */
+
+const SCAN_ID  = window.location.pathname.split('/').pop();
+let _all       = [];   // all findings fetched
+let _filtered  = [];
+let _page      = 1;
+let _perPage   = 20;
+
+const SEV_ORDER = { critical:1, high:2, medium:3, low:4, info:5 };
+
+// ── Boot ──────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const [scanData, rulesData] = await Promise.all([
+      apiFetch(`/scanner/scan/${SCAN_ID}?per_page=1000`),
+      apiFetch('/scanner/rules'),
+    ]);
+
+    populateHeader(scanData.scan);
+    populateRuleFilter(rulesData.rules);
+    _all = scanData.findings;
+    _all.sort((a, b) =>
+      (SEV_ORDER[a.severity] || 9) - (SEV_ORDER[b.severity] || 9) ||
+      (a.line_number || 0) - (b.line_number || 0)
+    );
+    applyFilters();
+  } catch(e) {
+    document.getElementById('findingsList').innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div>
+       <div class="empty-title">Failed to load results</div>
+       <div class="empty-desc">${escapeHtml(e.message)}</div></div>`;
+  }
+}
+
+function populateHeader(scan) {
+  document.getElementById('scanFilename').textContent = scan.original_filename || '(unnamed)';
+  const completed = scan.completed_at
+    ? `Completed ${new Date(scan.completed_at).toLocaleString()}`
+    : `Started ${new Date(scan.created_at).toLocaleString()}`;
+  document.getElementById('scanMeta').textContent = completed;
+
+  document.getElementById('stFiles').textContent = scan.total_files_scanned ?? 0;
+  document.getElementById('stCrit').textContent  = scan.critical_count ?? 0;
+  document.getElementById('stHigh').textContent  = scan.high_count ?? 0;
+  document.getElementById('stMed').textContent   = scan.medium_count ?? 0;
+  document.getElementById('stLow').textContent   = (scan.low_count ?? 0) + (scan.info_count ?? 0);
+
+  if (scan.security_score !== null && scan.security_score !== undefined) {
+    document.getElementById('stScore').textContent = Math.round(scan.security_score);
+    const grade = scan.security_grade || '—';
+    const gEl   = document.getElementById('stGrade');
+    gEl.textContent = grade;
+    gEl.className   = `grade-badge grade-${grade.replace('+', '\\+')}`;
+  } else {
+    document.getElementById('stScore').textContent = '—';
+    document.getElementById('stGrade').textContent = '—';
+  }
+}
+
+function populateRuleFilter(rules) {
+  const sel = document.getElementById('filterRule');
+  Object.entries(rules).forEach(([id, r]) => {
+    const opt = document.createElement('option');
+    opt.value       = id;
+    opt.textContent = `${id} — ${r.title}`;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Filters ───────────────────────────────────────────────────────────
+function applyFilters() {
+  const search  = document.getElementById('filterSearch').value.toLowerCase();
+  const sev     = document.getElementById('filterSev').value;
+  const rule    = document.getElementById('filterRule').value;
+  const minConf = parseFloat(document.getElementById('filterConf').value) || 0;
+
+  _filtered = _all.filter(f => {
+    if (sev  && f.severity !== sev) return false;
+    if (rule && f.rule_id  !== rule) return false;
+    if ((f.confidence ?? 0) < minConf) return false;
+    if (search) {
+      const haystack = [
+        f.rule_id, f.rule_title, f.file_name,
+        f.description, f.evidence, f.recommendation,
+      ].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  _page = 1;
+  document.getElementById('filterSummary').textContent =
+    `Showing ${_filtered.length} of ${_all.length} finding${_all.length !== 1 ? 's' : ''}`;
+  renderPage();
+}
+
+function resetFilters() {
+  ['filterSearch','filterSev','filterRule','filterConf'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
+  });
+  applyFilters();
+}
+
+function changePerPage() {
+  _perPage = parseInt(document.getElementById('filterPerPage').value, 10);
+  _page = 1;
+  renderPage();
+}
+
+// ── Render page ───────────────────────────────────────────────────────
+function renderPage() {
+  const start = (_page - 1) * _perPage;
+  const slice = _filtered.slice(start, start + _perPage);
+  const pages = Math.max(1, Math.ceil(_filtered.length / _perPage));
+
+  renderFindings(slice);
+  renderPagination(pages);
+}
+
+function renderFindings(findings) {
+  const el = document.getElementById('findingsList');
+
+  if (!findings.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <div class="empty-title">No findings match your filters</div>
+        <div class="empty-desc">This is a good sign! Try clearing filters to see all results.</div>
+        <button class="btn btn-ghost" onclick="resetFilters()">Clear Filters</button>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = findings.map(f => {
+    const conf    = Math.round((f.confidence ?? 0) * 100);
+    const confCol = conf >= 90 ? 'var(--danger)' : conf >= 70 ? 'var(--warning)' : 'var(--success)';
+    const lineTxt = f.line_number ? `Line ${f.line_number}` : 'No line info';
+
+    return `
+    <div class="finding-card sev-${f.severity}">
+      <div class="flex items-center justify-between flex-wrap gap-2" style="margin-bottom:8px;">
+        <div class="finding-title">${escapeHtml(f.rule_id)}: ${escapeHtml(f.rule_title)}</div>
+        <span class="badge badge-${f.severity}">${f.severity.toUpperCase()}</span>
+      </div>
+
+      <div class="finding-meta">
+        <span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          ${escapeHtml(f.file_name || 'unknown')}
+        </span>
+        <span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          ${lineTxt}
+        </span>
+        <span>Rule ${escapeHtml(f.rule_id)}</span>
+      </div>
+
+      <div class="finding-body">${escapeHtml(f.description || '')}</div>
+
+      ${f.evidence ? `
+        <div class="finding-evidence">${escapeHtml(f.evidence)}</div>` : ''}
+
+      ${f.recommendation ? `
+        <div class="finding-rec">
+          <strong>Recommendation:</strong> ${escapeHtml(f.recommendation)}
+        </div>` : ''}
+
+      <div class="confidence-bar" style="margin-top:12px;">
+        <span>Confidence</span>
+        <div class="confidence-track">
+          <div class="confidence-fill" style="width:${conf}%;background:${confCol};"></div>
+        </div>
+        <span style="color:${confCol};font-weight:600;">${conf}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Pagination ────────────────────────────────────────────────────────
+function renderPagination(pages) {
+  const bar = document.getElementById('paginationBar');
+  if (pages <= 1) { bar.innerHTML = ''; return; }
+
+  const range = buildRange(_page, pages, 7);
+  let html = `<button class="page-btn" onclick="goPage(${_page-1})" ${_page===1?'disabled':''} aria-label="Previous">‹</button>`;
+  let prev = null;
+  for (const n of range) {
+    if (prev !== null && n - prev > 1)
+      html += `<span class="page-btn" style="cursor:default;border:none;">…</span>`;
+    html += `<button class="page-btn ${n===_page?'active':''}" onclick="goPage(${n})">${n}</button>`;
+    prev = n;
+  }
+  html += `<button class="page-btn" onclick="goPage(${_page+1})" ${_page===pages?'disabled':''} aria-label="Next">›</button>`;
+  bar.innerHTML = html;
+}
+
+function buildRange(cur, total, max) {
+  if (total <= max) return Array.from({length:total},(_,i)=>i+1);
+  const half = Math.floor(max/2);
+  let s = Math.max(1, cur-half);
+  let e = Math.min(total, s+max-1);
+  if (e-s < max-1) s = Math.max(1, e-max+1);
+  return Array.from({length:e-s+1},(_,i)=>s+i);
+}
+
+function goPage(n) {
+  const pages = Math.max(1, Math.ceil(_filtered.length/_perPage));
+  _page = Math.max(1, Math.min(n, pages));
+  renderPage();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── Export ────────────────────────────────────────────────────────────
+function exportFmt(fmt) {
+  window.location.href = `/api/reports/scan/${SCAN_ID}/${fmt}`;
+}
+
+// ── Delete ────────────────────────────────────────────────────────────
+function askDelete() {
+  document.getElementById('deleteModal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('deleteModal').classList.remove('open');
+}
+async function doDelete() {
+  try {
+    await apiFetch(`/scanner/scan/${SCAN_ID}`, { method:'DELETE' });
+    window.location.href = '/history';
+  } catch(e) {
+    showAlert(e.message, 'error');
+    closeModal();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

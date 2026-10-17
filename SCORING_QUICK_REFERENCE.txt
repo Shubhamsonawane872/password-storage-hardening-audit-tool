@@ -1,0 +1,266 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║           PASSWORD AUDIT TOOL v2.0 - COMPREHENSIVE SCORING SYSTEM             ║
+║                            QUICK REFERENCE GUIDE                              ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ THE 5 SCORING ALGORITHMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. 🔴 CVSS v3.1-INSPIRED (0-10)
+   ├─ Industry standard severity with context
+   ├─ Accounts for: Authentication code, production status, admin impact
+   ├─ High score = Critical severity in important context
+   ├─ Use for: Real-world risk assessment
+   └─ Example: 9.2 = Plaintext password in auth.py
+
+2. 📊 WEIGHTED AGGREGATE (0-100)
+   ├─ Traditional "start at 100, lose points" approach
+   ├─ Deducts: Critical(-40), High(-25), Medium(-12), Low(-5)
+   ├─ Adjusted by: Finding confidence scores
+   ├─ Use for: Intuitive pass/fail grading
+   └─ Example: 65.3 = Failing, needs improvement
+
+3. 🎯 RISK LEVEL (Critical/High/Medium/Low/Info)
+   ├─ Threshold-based categorical assessment
+   ├─ Logic: Worst-case risk determination
+   ├─ Output: Simple risk tier + reasoning
+   ├─ Use for: Executive summaries, compliance
+   └─ Example: "HIGH - 3 high-severity findings present"
+
+4. 📈 CONFIDENCE-WEIGHTED (0-100)
+   ├─ Accounts for detection reliability
+   ├─ Higher confidence = more impact on score
+   ├─ Highlights: Low-confidence findings for manual review
+   ├─ Use for: Understanding finding trustworthiness
+   └─ Example: 0.95 confidence = Act with confidence
+
+5. 🌐 ENTROPY RISK (0-100 + Distribution)
+   ├─ Analyzes finding concentration
+   ├─ Shows: Where problems are concentrated
+   ├─ Helps: Prioritize remediation efforts
+   ├─ Use for: Determining where to focus fixes
+   └─ Example: "High concentration in auth.py - fix there first"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ YOUR PRIMARY SCORE = WEIGHTED AVERAGE OF ALL 5
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    30% CVSS v3.1-Inspired
+    40% Weighted Aggregate       } PRIMARY SCORE (0-100)
+    30% Confidence-Weighted
+    
+    Plus: Risk Level + Entropy analysis
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GRADE SCALE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Score    Grade  Status             Color    Action
+────────────────────────────────────────────────────────
+90-100   A+     Excellent          🟢 Green  Maintain
+85-89    A      Very Good          🟢 Green  Keep current
+80-84    A-     Good               🟢 Green  Monitor
+75-79    B+     Satisfactory       🟡 Yellow Plan improvements
+70-74    B      Fair               🟡 Yellow Action needed
+65-69    B-     Weak               🟠 Orange Urgent work
+60-64    C+     Poor               🟠 Orange Major issues
+55-59    C      Poor               🟠 Orange Critical fixes
+50-54    D      Critical           🔴 Red    Emergency
+<50      F      Failure            🔴 Red    Stop & fix
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ CONFIDENCE LEVELS (How sure we are)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+0.95-0.99   🔴 VERY HIGH    Nearly certain, strong evidence
+0.85-0.94   🟠 HIGH         Confident, good evidence
+0.70-0.84   🟡 MEDIUM       Confident, pattern matches
+0.50-0.69   🟢 LOW          Needs verification
+<0.50       ⚪ VERY LOW     Manual review essential
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ SEVERITY LEVELS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CRITICAL  🔴  Fix immediately     High-impact vulnerabilities
+HIGH      🟠  Fix within days     Significant security issues
+MEDIUM    🟡  Plan fixes          Moderate concerns
+LOW       🟢  Routine updates     Minor issues
+INFO      ⚪  Monitor            Informational findings
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ CONCENTRATION LEVELS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HIGH         83% in 1-2 files    👈 Fix those files first
+MEDIUM       Spread across 3-5   → Systematic approach
+LOW          Spread across 10+   → Infrastructure/process fix
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ RISK LEVELS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CRITICAL   10   Any critical vulnerability           🛑 STOP
+HIGH       8    3+ high-severity findings            ⚠️  URGENT
+MEDIUM     5    10+ medium-severity findings        ⚠️  PLAN
+LOW        2    Only low/info findings              ✅  OK
+INFO       1    Only informational                   ✅  INFO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ EXAMPLE REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Scan Results:
+├─ PRIMARY SCORE: 65.3 / 100
+├─ GRADE: C+ (Poor)
+├─ ASSESSMENT: High security risk
+│
+├─ Findings: 8 total
+│  ├─ Critical: 1 🔴
+│  ├─ High: 3 🟠
+│  ├─ Medium: 2 🟡
+│  ├─ Low: 1 🟢
+│  └─ Info: 1 ⚪
+│
+├─ Algorithm Breakdown:
+│  ├─ CVSS:        8.7/10 (Very High)
+│  ├─ Weighted:    38.2/100 (Poor)
+│  ├─ Risk Level:  HIGH 🔴
+│  ├─ Confidence:  93.8% (Very High)
+│  └─ Entropy:     25.3 (Concentrated)
+│
+├─ Recommendations:
+│  1. URGENT: Address 1 critical vulnerability immediately
+│  2. Priority: Remediate 3 high-severity findings within days
+│  3. Focus: Problems concentrated in auth.py - fix there first
+│
+└─ Next Steps:
+   → View detailed breakdown at: /api/scanner/scan/1/scoring-breakdown
+   → Fix critical findings first
+   → Then address high-severity issues
+   → Then medium and low
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ CONTEXT MULTIPLIERS (How location affects severity)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Location              Multiplier  Impact
+────────────────────────────────────────
+Authentication code   1.4x        Higher severity
+Production code       1.3x        Higher severity
+Admin-related code    1.5x        Highest severity
+Test/Demo code        0.3x        Lower severity
+Config files          1.1x        Slightly higher
+
+Example: 
+Plaintext password = 9.0 base
+In auth.py (1.4x) × in production (1.3x) = 9.0 × 1.82 = 16.4 → capped at 10.0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ API ENDPOINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POST /api/scanner/upload
+└─ Returns: primary_score, grade, recommendations
+
+GET /api/scanner/scan/<id>/scoring-breakdown
+├─ Returns: Complete report with all 5 algorithms
+├─ Includes: Severity distribution, confidence analysis
+├─ Shows: Methodology and explanations
+└─ Provides: Detailed recommendations
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ BEST PRACTICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ DO:
+├─ Read all 5 algorithm results together
+├─ Check confidence levels
+├─ Follow recommendations in order
+├─ Use concentration data to prioritize
+├─ Scan regularly (after each change)
+├─ Verify high-priority findings manually
+└─ Track improvement over time
+
+❌ DON'T:
+├─ Rely on a single score alone
+├─ Ignore low-confidence findings
+├─ Forget about context (test vs production)
+├─ Assume high score = no issues
+├─ Make security decisions without review
+└─ Deploy with grade C or lower
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Q: Why is my score lower than expected?
+A: Check confidence levels. Low-confidence findings reduce score less.
+
+Q: What does "concentrated" mean?
+A: Findings in few files (easy to fix) vs spread across many (systematic).
+
+Q: Can I ignore low-confidence findings?
+A: No. Manually verify them - they may indicate real issues.
+
+Q: How often should I scan?
+A: After code changes. Quarterly minimum. Pre-deployment mandatory.
+
+Q: Which algorithm matters most?
+A: PRIMARY SCORE (weighted average). But read all 5 for context.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ DOCUMENTATION REFERENCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 SCORING_SYSTEM.md
+   → Complete methodology documentation
+   → Detailed algorithm explanations
+   → When to use each approach
+   → Best practices guide
+
+📋 SCORING_EXAMPLE.md
+   → Real-world scoring examples
+   → How to read the reports
+   → Full API response walkthrough
+   → FAQ section
+
+🚀 SCORING_IMPROVEMENTS.md
+   → What was improved in v2.0
+   → Feature overview
+   → Developer guide
+   → Implementation details
+
+📌 This File (SCORING_QUICK_REFERENCE.txt)
+   → Quick lookup reference
+   → Visual guides and scales
+   → Checklists and examples
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ QUICK DECISION MATRIX: WHAT TO DO BASED ON YOUR SCORE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Score   Grade   Risk       Recommendation
+─────────────────────────────────────────────────────────────────────────
+90-100  A+      Low        ✅ Excellent! Maintain practices
+85-89   A       Low        ✅ Very good - keep going
+80-84   A-      Low        ✅ Good - routine monitoring
+75-79   B+      Moderate   ⚠️  Plan improvements soon
+70-74   B       Moderate   ⚠️  Notable issues to address
+65-69   B-      Moderate   🔶 Significant work required
+60-64   C+      High       🔴 Major security issues
+55-59   C       High       🔴 Critical remediation needed
+50-54   D       Critical   🛑 EMERGENCY - fix immediately
+<50     F       Critical   🛑 CRITICAL - do not deploy
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Last Updated: October 16, 2026
+System: Password Audit Tool v2.0
+Version: Comprehensive Scoring System v1.0
+Status: Production Ready ✅
+
+Questions? See SCORING_SYSTEM.md for detailed documentation.
+
+╚════════════════════════════════════════════════════════════════════════════════╝

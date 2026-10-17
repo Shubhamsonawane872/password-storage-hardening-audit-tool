@@ -1,0 +1,16 @@
+{% extends "errors/_base_error.html" %}
+
+{% block err_title %}401 Unauthorised{% endblock %}
+{% block err_grad %}#8b5cf6, #5b6cf9{% endblock %}
+{% block err_code %}401{% endblock %}
+{% block err_title_text %}You're not signed in{% endblock %}
+{% block err_desc %}
+  This page requires authentication. Please sign in with your account to continue.
+{% endblock %}
+{% block err_actions %}
+  <a href="/login"    class="btn btn-primary">Sign In</a>
+  <a href="/register" class="btn btn-ghost">Create Account</a>
+{% endblock %}
+{% block err_hint %}
+  If you were signed in, your session may have expired.
+{% endblock %}

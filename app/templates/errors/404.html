@@ -1,0 +1,18 @@
+{% extends "errors/_base_error.html" %}
+
+{% block err_title %}404 Not Found{% endblock %}
+{% block err_grad %}#3b82f6, #5b6cf9{% endblock %}
+{% block err_code %}404{% endblock %}
+{% block err_title_text %}Page Not Found{% endblock %}
+{% block err_desc %}
+  We couldn't find what you were looking for. The page may have been moved,
+  deleted, or never existed.
+{% endblock %}
+{% block err_actions %}
+  <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
+  <a href="/scan"      class="btn btn-ghost">New Scan</a>
+  <a href="/"          class="btn btn-ghost">Home</a>
+{% endblock %}
+{% block err_hint %}
+  HTTP 404 — the requested URL was not found on this server.
+{% endblock %}

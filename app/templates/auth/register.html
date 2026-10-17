@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Password Audit Tool{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h1>Create Account</h1>
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" required>
+                <small id="nameError" class="error-message"></small>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+                <small id="emailError" class="error-message"></small>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+                <small id="passwordError" class="error-message"></small>
+                <div id="passwordRequirements" class="password-requirements">
+                    <p>Password must contain:</p>
+                    <ul>
+                        <li id="req-length">✗ At least 8 characters</li>
+                        <li id="req-upper">✗ Uppercase letter</li>
+                        <li id="req-lower">✗ Lowercase letter</li>
+                        <li id="req-digit">✗ Digit</li>
+                        <li id="req-special">✗ Special character (!@#$%^&*)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" required>
+                <small id="confirmError" class="error-message"></small>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Register</button>
+        </form>
+
+        <p class="auth-footer">
+            Already have an account? <a href="/login">Sign in</a>
+        </p>
+    </div>
+</div>
+
+<style>
+.auth-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 200px);
+    padding: 20px;
+}
+
+.auth-card {
+    background: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 400px;
+}
+
+.auth-card h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: var(--primary);
+}
+
+.error-message {
+    color: var(--danger);
+    font-size: 12px;
+    display: block;
+    margin-top: 3px;
+}
+
+.password-requirements {
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.password-requirements p {
+    margin: 0 0 8px 0;
+    font-weight: bold;
+}
+
+.password-requirements ul {
+    list-style: none;
+    padding: 0;
+}
+
+.password-requirements li {
+    padding: 3px 0;
+    color: #999;
+}
+
+.password-requirements li.met {
+    color: var(--success);
+}
+
+.password-requirements li.met::before {
+    content: '✓ ';
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.auth-footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.auth-footer a:hover {
+    text-decoration: underline;
+}
+</style>
+
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    // Validate
+    let valid = true;
+    
+    if (!name) {
+        document.getElementById('nameError').textContent = 'Name is required';
+        valid = false;
+    }
+    
+    if (!email || !validateEmail(email)) {
+        document.getElementById('emailError').textContent = 'Valid email required';
+        valid = false;
+    }
+    
+    const passwordErrors = validatePassword(password);
+    if (passwordErrors.length > 0) {
+        document.getElementById('passwordError').textContent = passwordErrors[0];
+        valid = false;
+    }
+    
+    if (password !== confirmPassword) {
+        document.getElementById('confirmError').textContent = 'Passwords do not match';
+        valid = false;
+    }
+    
+    if (!valid) return;
+    
+    try {
+        const response = await apiFetch('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+                name,
+                email,
+                password,
+                confirm_password: confirmPassword
+            })
+        });
+        
+        showAlert('Registration successful! Redirecting to login...', 'success');
+        setTimeout(() => {
+            window.location.href = '/login';
+        }, 2000);
+    } catch (error) {
+        showAlert(error.message || 'Registration failed', 'error');
+    }
+});
+
+// Update password requirements as user types
+document.getElementById('password').addEventListener('input', (e) => {
+    const password = e.target.value;
+    
+    document.getElementById('req-length').classList.toggle('met', password.length >= 8);
+    document.getElementById('req-upper').classList.toggle('met', /[A-Z]/.test(password));
+    document.getElementById('req-lower').classList.toggle('met', /[a-z]/.test(password));
+    document.getElementById('req-digit').classList.toggle('met', /\d/.test(password));
+    document.getElementById('req-special').classList.toggle('met', /[!@#$%^&*()_+=\-\[\]{};:\'",.<>?/\\|`~]/.test(password));
+});
+</script>
+{% endblock %}

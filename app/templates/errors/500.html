@@ -1,0 +1,19 @@
+{% extends "errors/_base_error.html" %}
+
+{% block err_title %}500 Server Error{% endblock %}
+{% block err_grad %}#dc2626, #991b1b{% endblock %}
+{% block err_code %}500{% endblock %}
+{% block err_title_text %}Something went wrong on our end{% endblock %}
+{% block err_desc %}
+  An unexpected error occurred while processing your request. The issue has been
+  logged. Please try again in a moment.
+{% endblock %}
+{% block err_actions %}
+  <a href="javascript:location.reload()" class="btn btn-primary">↻ Try Again</a>
+  <a href="/dashboard"                   class="btn btn-ghost">Dashboard</a>
+  <a href="/"                            class="btn btn-ghost">Home</a>
+{% endblock %}
+{% block err_hint %}
+  HTTP 500 — if this error persists, contact your system administrator.
+  No sensitive details are disclosed in production mode.
+{% endblock %}

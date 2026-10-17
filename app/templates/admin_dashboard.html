@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Password Audit Tool{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <h1>Admin Dashboard</h1>
+
+    <div class="grid grid-4">
+        <div class="stat-box">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-number" id="totalUsers">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Active Users</div>
+            <div class="stat-number" id="activeUsers">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Total Scans</div>
+            <div class="stat-number" id="totalScans">0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Total Findings</div>
+            <div class="stat-number" id="totalFindings">0</div>
+        </div>
+    </div>
+
+    <div class="grid grid-2">
+        <div class="card">
+            <div class="card-title">Users</div>
+            <div id="usersList"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Recent Activity</div>
+            <div id="auditLog"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+#usersList table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#usersList th {
+    background: #f9f9f9;
+    border-bottom: 2px solid var(--primary);
+    padding: 12px;
+    text-align: left;
+    font-weight: bold;
+}
+
+#usersList td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+#usersList tr:hover {
+    background: #fafafa;
+}
+
+.user-action-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.user-action-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.user-action-btn-enable {
+    background: #4caf50;
+    color: white;
+}
+
+.user-action-btn-disable {
+    background: #f44336;
+    color: white;
+}
+
+#auditLog {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.audit-entry {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.audit-entry:hover {
+    background: #f9f9f9;
+}
+</style>
+
+<script>
+async function loadAdminStats() {
+    try {
+        const data = await apiFetch('/admin/stats');
+        const stats = data.stats;
+        
+        document.getElementById('totalUsers').textContent = stats.total_users;
+        document.getElementById('activeUsers').textContent = stats.active_users;
+        document.getElementById('totalScans').textContent = stats.total_scans;
+        document.getElementById('totalFindings').textContent = stats.total_findings;
+        
+        loadUsers();
+        loadAuditLog();
+    } catch (error) {
+        showAlert('Failed to load admin statistics', 'error');
+        console.error(error);
+    }
+}
+
+async function loadUsers() {
+    try {
+        const data = await apiFetch('/admin/users');
+        displayUsers(data.users);
+    } catch (error) {
+        showAlert('Failed to load users', 'error');
+    }
+}
+
+function displayUsers(users) {
+    const container = document.getElementById('usersList');
+    
+    let html = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    users.forEach(user => {
+        const statusBadge = user.is_active ? 
+            '<span class="badge badge-info">Active</span>' : 
+            '<span class="badge badge-warning">Inactive</span>';
+        
+        const action = user.is_active ? 
+            `<button class="user-action-btn user-action-btn-disable" onclick="toggleUser(${user.id}, false)">Deactivate</button>` :
+            `<button class="user-action-btn user-action-btn-enable" onclick="toggleUser(${user.id}, true)">Activate</button>`;
+        
+        html += `
+            <tr>
+                <td>${escapeHtml(user.name)}</td>
+                <td>${escapeHtml(user.email)}</td>
+                <td><span class="badge badge-secondary">${user.role}</span></td>
+                <td>${statusBadge}</td>
+                <td>
+                    <div class="user-action-buttons">
+                        ${action}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+            </tbody>
+        </table>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function toggleUser(userId, activate) {
+    const endpoint = activate ? 'activate' : 'deactivate';
+    apiFetch(`/admin/user/${userId}/${endpoint}`, { method: 'POST' })
+        .then(() => {
+            showAlert(activate ? 'User activated' : 'User deactivated', 'success');
+            loadUsers();
+        })
+        .catch(error => {
+            showAlert('Failed to update user', 'error');
+        });
+}
+
+async function loadAuditLog() {
+    try {
+        const data = await apiFetch('/admin/audit-logs?limit=20');
+        displayAuditLog(data.logs);
+    } catch (error) {
+        showAlert('Failed to load audit logs', 'error');
+    }
+}
+
+function displayAuditLog(logs) {
+    const container = document.getElementById('auditLog');
+    
+    if (logs.length === 0) {
+        container.innerHTML = '<p class="empty-state">No activity</p>';
+        return;
+    }
+    
+    let html = '';
+    logs.forEach(log => {
+        const date = new Date(log.timestamp).toLocaleString();
+        html += `
+            <div class="audit-entry">
+                <strong>${log.action}</strong> - ${date}
+                <br><small style="color: #999;">${log.resource_type} | Status: ${log.status}</small>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', loadAdminStats);
+</script>
+{% endblock %}

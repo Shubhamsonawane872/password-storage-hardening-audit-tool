@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}New Scan — Password Audit Tool{% endblock %}
+
+{% block breadcrumb %}
+<nav class="breadcrumb">
+  <a href="/dashboard">Dashboard</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-current">New Scan</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width:740px;">
+
+  <div class="page-header">
+    <h1 class="page-title">New Security Scan</h1>
+    <p class="page-subtitle">
+      Upload a source file or ZIP archive — the scanner checks for insecure
+      password-storage patterns without executing your code.
+    </p>
+  </div>
+
+  <!-- Upload card -->
+  <div class="card mb-2">
+    <div class="card-header"><span class="card-title">Upload Source Code</span></div>
+
+    <div class="alert alert-info mb-2" style="font-size:13px;">
+      <div>
+        <strong>Supported formats:</strong>
+        Python (.py), JavaScript (.js), Java (.java), PHP (.php), ZIP archives.<br>
+        <strong>Limits:</strong> 10 MB per file · 50 MB per ZIP · 100 files per archive.<br>
+        Uploaded files are deleted immediately after analysis.
+      </div>
+    </div>
+
+    <form id="uploadForm">
+      <!-- Drop zone -->
+      <label class="drop-zone" id="dropZone" for="fileInput" tabindex="0"
+             onkeydown="if(event.key==='Enter'||event.key===' ')fileInput.click()">
+        <input type="file" id="fileInput" name="file" accept=".py,.js,.java,.php,.zip" required>
+        <div class="drop-icon" id="dropIcon">📂</div>
+        <div class="drop-title" id="dropTitle">Drop files here or click to browse</div>
+        <div class="drop-hint" id="dropHint">.py · .js · .java · .php · .zip</div>
+      </label>
+
+      <!-- File info row (shown after selection) -->
+      <div id="fileInfo" class="hidden" style="
+        display:flex;align-items:center;gap:12px;
+        padding:12px 16px;background:var(--surface2);
+        border:1px solid var(--border);border-radius:var(--radius);margin-top:12px;">
+        <span id="fileInfoIcon" style="font-size:24px;">📄</span>
+        <div style="flex:1;min-width:0;">
+          <div id="fileInfoName" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+          <div id="fileInfoSize" style="font-size:12px;color:var(--text3);"></div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="clearFile()">×</button>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full mt-2" id="submitBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Start Scan
+      </button>
+    </form>
+
+    <!-- Progress area (shown during upload/scan) -->
+    <div id="progressArea" class="hidden mt-2" style="text-align:center;">
+      <div class="spinner" style="margin:0 auto 12px;"></div>
+      <div id="progressMsg" style="font-size:14px;color:var(--text2);">Uploading…</div>
+      <div class="progress mt-1">
+        <div class="progress-fill" id="progressFill" style="width:0%;transition:width .4s ease;"></div>
+      </div>
+    </div>
+
+    <!-- Result area (shown after completion) -->
+    <div id="resultArea" class="hidden mt-2">
+      <div class="alert alert-success" id="resultAlert"></div>
+      <div class="flex gap-2 mt-2">
+        <a id="viewResultsBtn" href="#" class="btn btn-primary">View Results →</a>
+        <button class="btn btn-ghost" onclick="resetForm()">Scan Another File</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan rules reference -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">What We Detect</span>
+      <span style="font-size:12px;color:var(--text3);">13 rules (PWD001–PWD013)</span>
+    </div>
+    <div id="rulesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">
+      <div class="spinner"></div>
+    </div>
+    <p class="mt-2" style="font-size:12px;color:var(--text3);">
+      ⚠ Static analysis only — results may include false positives and false negatives.
+      Always complement with manual code review and dynamic testing.
+    </p>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SEV_COLORS = {
+  critical:'var(--critical)', high:'var(--high)',
+  medium:'var(--medium)', low:'var(--low)', info:'var(--inf)',
+};
+const FILE_ICONS = { py:'🐍', js:'📜', java:'☕', php:'🐘', zip:'🗜️' };
+
+// ── Drop zone wiring ──────────────────────────────────────────────────
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFileSelected(fileInput.files[0]);
+});
+
+['dragenter','dragover'].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag-over'); })
+);
+['dragleave','drop'].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag-over'); })
+);
+dropZone.addEventListener('drop', e => {
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    // Inject into file input (works in modern browsers)
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    handleFileSelected(file);
+  }
+});
+
+function handleFileSelected(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const ALLOWED = ['py','js','java','php','zip'];
+  const MAX = file.name.endsWith('.zip') ? 52428800 : 10485760;
+
+  if (!ALLOWED.includes(ext)) {
+    showAlert(`Unsupported file type ".${ext}". Use: .py .js .java .php .zip`, 'error');
+    return;
+  }
+  if (file.size > MAX) {
+    showAlert(`File too large (${(file.size/1048576).toFixed(1)} MB). Max: ${MAX/1048576} MB.`, 'error');
+    return;
+  }
+
+  // Show file info strip
+  document.getElementById('fileInfo').classList.remove('hidden');
+  document.getElementById('fileInfoIcon').textContent = FILE_ICONS[ext] || '📄';
+  document.getElementById('fileInfoName').textContent = file.name;
+  document.getElementById('fileInfoSize').textContent = `${(file.size/1024).toFixed(1)} KB`;
+  document.getElementById('dropZone').style.display = 'none';
+  document.getElementById('submitBtn').disabled = false;
+}
+
+function clearFile() {
+  fileInput.value = '';
+  document.getElementById('fileInfo').classList.add('hidden');
+  document.getElementById('dropZone').style.display = '';
+  document.getElementById('submitBtn').disabled = true;
+}
+
+// ── Upload form ───────────────────────────────────────────────────────
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  // UI: show progress
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('progressArea').classList.remove('hidden');
+  document.getElementById('fileInfo').classList.add('hidden');
+  animateProgress();
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const resp = await fetch('/api/scanner/upload', { method:'POST', body: formData });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || 'Upload failed');
+    }
+    const data = await resp.json();
+
+    // Success
+    document.getElementById('progressArea').classList.add('hidden');
+    document.getElementById('resultArea').classList.remove('hidden');
+    document.getElementById('resultAlert').innerHTML =
+      `Scan complete — <strong>${data.findings}</strong> finding${data.findings !== 1 ? 's' : ''} in
+       <strong>${data.files_scanned}</strong> file${data.files_scanned !== 1 ? 's' : ''}.
+       Security grade: <strong>${data.security_grade || '—'}</strong>`;
+    document.getElementById('viewResultsBtn').href = `/scan/${data.scan_id}`;
+
+  } catch(err) {
+    document.getElementById('progressArea').classList.add('hidden');
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('fileInfo').classList.remove('hidden');
+    showAlert(`Scan failed: ${err.message}`, 'error');
+  }
+});
+
+function resetForm() {
+  clearFile();
+  document.getElementById('resultArea').classList.add('hidden');
+  document.getElementById('submitBtn').disabled = true;
+}
+
+// Fake progress animation while waiting
+let _progInterval = null;
+function animateProgress() {
+  let pct = 0;
+  const fill = document.getElementById('progressFill');
+  const msg  = document.getElementById('progressMsg');
+  clearInterval(_progInterval);
+  _progInterval = setInterval(() => {
+    pct = pct < 30 ? pct + 2 :   // upload phase
+          pct < 70 ? pct + 1 :   // scan phase
+          pct < 92 ? pct + 0.3 : pct; // finalising
+    fill.style.width = pct + '%';
+    msg.textContent =
+      pct < 35 ? 'Uploading file…' :
+      pct < 70 ? 'Scanning for vulnerabilities…' :
+      'Finalising results…';
+  }, 80);
+}
+
+// ── Rules reference grid ──────────────────────────────────────────────
+async function loadRules() {
+  try {
+    const { rules } = await apiFetch('/scanner/rules');
+    const grid = document.getElementById('rulesGrid');
+    grid.innerHTML = Object.entries(rules).map(([id, r]) => `
+      <div style="
+        padding:12px 14px;
+        background:var(--surface2);
+        border:1px solid var(--border);
+        border-left:3px solid ${SEV_COLORS[r.severity] || 'var(--primary)'};
+        border-radius:var(--radius);font-size:13px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-weight:700;font-family:var(--mono);color:var(--text);">${escapeHtml(id)}</span>
+          <span class="badge badge-${r.severity}">${r.severity}</span>
+        </div>
+        <div style="color:var(--text2);">${escapeHtml(r.title)}</div>
+      </div>`).join('');
+  } catch { /* non-fatal */ }
+}
+
+document.addEventListener('DOMContentLoaded', loadRules);
+</script>
+{% endblock %}
