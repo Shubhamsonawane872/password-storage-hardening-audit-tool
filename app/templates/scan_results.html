@@ -225,6 +225,20 @@ function populateRuleFilter(rules) {
   });
 }
 
+function secureExample(ruleId) {
+  const examples = {
+    PWD001: 'password_hash = password_hasher.hash(password)  # Argon2id',
+    PWD002: 'password_hash = password_hasher.hash(password)  # Argon2id',
+    PWD003: 'password_hash = password_hasher.hash(password)  # Argon2id',
+    PWD004: 'api_key = os.environ["API_KEY"]',
+    PWD005: 'password_hash = password_hasher.hash(password)  # Argon2id',
+    PWD007: 'password_hash = password_hasher.hash(password)  # Keep using a password KDF',
+    PWD009: 'jwt_secret = os.environ["JWT_SECRET"]',
+    PWD013: 'logger.info("Login attempt")  # Never include the password',
+  };
+  return examples[ruleId] || 'Use a reviewed cryptographic library; do not implement custom cryptography.';
+}
+
 function toggleInfoFindings() {
   _includeInfo = !_includeInfo;
   const count = _all.filter(f => f.severity === 'info').length;
@@ -332,9 +346,10 @@ function renderFindings(findings) {
 
       <p class="finding-body">${escapeHtml(f.description || '')}</p>
       <details class="finding-details">
-        <summary>Why it's risky and how to fix</summary>
+        <summary>${isGood ? 'What it does well' : 'Why it is risky and how to fix'}</summary>
         ${f.evidence ? `<pre class="finding-evidence"><code><mark>${escapeHtml(f.evidence)}</mark></code></pre>` : ''}
         ${f.recommendation ? `<div class="finding-rec"><strong>${isGood ? 'Good practice:' : 'How to fix:'}</strong> ${escapeHtml(f.recommendation)}</div>` : ''}
+        <div class="finding-rec"><strong>Secure example:</strong><pre><code>${escapeHtml(secureExample(f.rule_id))}</code></pre></div>
       </details>
     </article>`;
   }).join('')}</div>

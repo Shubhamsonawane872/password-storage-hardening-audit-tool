@@ -212,6 +212,10 @@ Then insert into the database.
 3. Export reports (JSON, HTML, CSV)
 4. View previous scans in "Scan History"
 
+### Score and Grade
+
+Every scan starts at 100 points. The scanner deducts 30 for a Critical rule, 20 for High, 10 for Medium, and 5 for Low. It applies each rule's deduction once even when that rule appears on multiple lines. PWD007 adds 5 points, with the final score kept between 0 and 100. Grades are A (90–100), B (75–89), C (60–74), D (40–59), and F (below 40). Scores and grades are stored with the scan and included in the results page, history, and JSON, HTML, and CSV exports.
+
 ### Admin Features (if admin user)
 
 1. Click "Admin" in navigation
