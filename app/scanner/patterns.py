@@ -135,13 +135,15 @@ class CodeScanner:
 
     # PWD002 – MD5   (fixed: now covers ALL md5 forms including hashlib.md5)
     _P002 = re.compile(
-        r'(hashlib\.md5\b|(?<!\w)md5\s*\(|MD5\s*\(|CryptoJS\.MD5|\.md5\()',
+        r'(hashlib\.md5\b|(?<!\w)md5\s*\(|MD5\s*\(|CryptoJS\.MD5|\.md5\('
+        r'|createHash\s*\(\s*[\'\"]md5[\'\"]|getInstance\s*\(\s*[\'\"]MD5[\'\"])',
         re.IGNORECASE,
     )
 
     # PWD003 – SHA-1  (fixed: covers hashlib.sha1 etc.)
     _P003 = re.compile(
-        r'(hashlib\.sha1\b|(?<!\w)sha1\s*\(|SHA1\s*\(|CryptoJS\.SHA1|\.sha1\()',
+        r'(hashlib\.sha1\b|(?<!\w)sha1\s*\(|SHA1\s*\(|CryptoJS\.SHA1|\.sha1\('
+        r'|createHash\s*\(\s*[\'\"]sha-?1[\'\"]|getInstance\s*\(\s*[\'\"]SHA-?1[\'\"])',
         re.IGNORECASE,
     )
 
@@ -164,6 +166,7 @@ class CodeScanner:
             re.IGNORECASE,
         ),
         re.compile(r"CryptoJS\.SHA(256|512)\s*\([^,]+\)", re.IGNORECASE),
+        re.compile(r"(?:createHash\s*\(\s*['\"]sha-?256['\"]|getInstance\s*\(\s*['\"]SHA-256['\"])", re.IGNORECASE),
         re.compile(r"hash\s*\(\s*['\"]sha(256|512)['\"]\s*,\s*\$password", re.IGNORECASE),
     ]
 

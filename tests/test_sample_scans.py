@@ -36,6 +36,22 @@ def test_sample_files_have_expected_rule_sets_and_grades():
         assert (summary["overall_score"], summary["grade"]) == (expected_score, expected_grade), filename
 
 
+def test_javascript_java_and_php_samples_are_classified():
+    expected = {
+        "plaintext_sample.js": "PWD001", "plaintext_sample.java": "PWD001", "plaintext_sample.php": "PWD001",
+        "md5_sample.js": "PWD002", "md5_sample.java": "PWD002", "md5_sample.php": "PWD002",
+        "sha1_sample.js": "PWD003", "sha1_sample.java": "PWD003", "sha1_sample.php": "PWD003",
+        "unsalted_sha256_sample.js": "PWD005", "unsalted_sha256_sample.java": "PWD005",
+        "unsalted_sha256_sample.php": "PWD005",
+        "hardcoded_secret.js": "PWD004", "hardcoded_secret.java": "PWD004", "hardcoded_secret.php": "PWD004",
+        "safe_hashing.js": "PWD007", "safe_hashing.java": "PWD007", "safe_hashing.php": "PWD007",
+    }
+    scanner = CodeScanner()
+    for filename, rule_id in expected.items():
+        content = (Path("sample_apps") / filename).read_text(encoding="utf-8")
+        assert rule_id in {finding["rule_id"] for finding in scanner.scan_file(filename, content)}, filename
+
+
 def test_scanning_same_sample_twice_is_deterministic():
     path = Path("sample_apps/vulnerable_sample.py")
     scanner = CodeScanner()
