@@ -1,5 +1,7 @@
 # Comprehensive Scoring System - Live Examples
 
+> **Current primary score rule:** start at 100 and deduct 40 per critical, 25 per high, 12 per medium, 5 per low, and 1 per info finding; clamp to 0–100 and apply the existing grade scale. Supplementary algorithms, context, and confidence do not affect the primary score or grade.
+
 ## Quick Start: Understanding Your Score
 
 When you upload code for scanning, you'll receive a detailed scoring report using **5 different algorithms**. Here's what you'll see:
@@ -15,8 +17,8 @@ Files Uploaded: auth.py, db.py, config.py
 Total Findings: 6
 Critical: 1 | High: 2 | Medium: 2 | Low: 1
 
-PRIMARY SCORE: 45.3 / 100
-GRADE: C+ (Poor - High security risk)
+PRIMARY SCORE: 0.0 / 100
+GRADE: F (Failure - Critical security risk)
 ```
 
 ### Detailed Breakdown by Algorithm
@@ -172,8 +174,8 @@ Files Uploaded: app.py, utils.py, models.py
 Total Findings: 4
 Critical: 0 | High: 0 | Medium: 2 | Low: 2
 
-PRIMARY SCORE: 82.5 / 100
-GRADE: A- (Good - Low-to-moderate risk)
+PRIMARY SCORE: 50.0 / 100
+GRADE: D (Critical)
 ```
 
 ### Quick Breakdown
@@ -250,8 +252,8 @@ Recommendation: "Continue monitoring - maintain current security posture"
   "timestamp": "2026-10-16T14:30:00Z",
   "scan_summary": {
     "total_findings": 6,
-    "overall_score": 45.3,
-    "grade": "C+",
+    "overall_score": 0.0,
+    "grade": "F",
     "assessment": "Poor - High security risk"
   },
   "severity_distribution": {
@@ -350,12 +352,12 @@ Recommendation: "Continue monitoring - maintain current security posture"
   ],
   "detailed_breakdown": {
     "methodology": {
-      "primary_score": "Weighted average (30% CVSS, 40% Aggregate, 30% Confidence)",
+      "primary_score": "Fixed severity deductions per finding, clamped to 0-100",
       "grade_scale": "A+ (90-100), A (85-89), ... F (<50)",
       "algorithms_used": ["cvss", "weighted", "risk_level", "confidence", "entropy"]
     },
     "how_to_read": {
-      "overall_score": "Primary metric (0-100) balancing multiple methods",
+      "overall_score": "Primary metric (0-100) from finding severities and counts",
       "grade": "Letter grade equivalent",
       "cvss_score": "Max CVSS-like severity (0-10)",
       "weighted_score": "Score based on severity and confidence weighting",
@@ -432,7 +434,7 @@ Grade Accuracy         Higher with high confidence
 A: Each algorithm looks at security differently. CVSS emphasizes severity, Weighted is traditional, Confidence accounts for certainty. Together they give a complete picture.
 
 **Q: Which score matters most?**  
-A: The PRIMARY SCORE (weighted average) is your main metric. But read all five for context.
+A: The primary score is based only on finding severities and counts. Read the other algorithms as supplementary context.
 
 **Q: What if I disagree with a finding?**  
 A: Check the confidence level. Low confidence findings warrant manual review and may be false positives.

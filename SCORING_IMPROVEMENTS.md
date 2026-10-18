@@ -1,5 +1,7 @@
 # Scoring System Enhancements - v2.0
 
+> **Current primary score rule:** start at 100 and deduct 40 per critical, 25 per high, 12 per medium, 5 per low, and 1 per info finding; clamp to 0–100, then apply the existing grade scale. Confidence, context, and the supplementary algorithms do not affect the primary score or grade.
+
 ## What Was Improved
 
 ### Before: Single Basic Algorithm
@@ -149,20 +151,17 @@ result = scorer.calculate(findings)
 
 ### Features:
 - Combines all 5 algorithms
-- Calculates primary score (weighted average)
+- Calculates primary score using fixed severity deductions per finding
 - Generates letter grades (A+ to F)
 - Creates actionable recommendations
 - Provides detailed methodology explanations
 
 ### Primary Score Calculation:
 ```
-Score = (CVSS × 0.3 + Weighted × 0.4 + Confidence × 0.3)
+Score = clamp(100 - (critical × 40 + high × 25 + medium × 12 + low × 5 + info × 1), 0, 100)
 ```
 
-**Weights:**
-- 30% CVSS v3.1-Inspired (severity with context)
-- 40% Weighted Aggregate (traditional approach)  
-- 30% Confidence-Weighted (reliability)
+The CVSS-inspired, risk-level, confidence, weighted, and entropy algorithms remain supplementary report details; they do not determine the primary score or grade.
 
 ### Grade Scale:
 ```
@@ -220,11 +219,11 @@ grade = scoring_report["scan_summary"]["grade"]
   "scan_id": 123,
   "files_scanned": 5,
   "findings": 8,
-  "security_score": 65.3,
-  "security_grade": "C+",
+  "security_score": 0.0,
+  "security_grade": "F",
   "scoring_details": {
     "algorithms_used": ["cvss", "weighted", "risk_level", "confidence", "entropy"],
-    "assessment": "Poor - High security risk"
+    "assessment": "Failure - Critical security risk"
   },
   "recommendations": [
     "URGENT: Address 1 critical vulnerability(ies) immediately",
@@ -244,9 +243,9 @@ grade = scoring_report["scan_summary"]["grade"]
   "timestamp": "2026-10-16T12:34:56Z",
   "scan_summary": {
     "total_findings": 8,
-    "overall_score": 65.3,
-    "grade": "C+",
-    "assessment": "Poor - High security risk"
+    "overall_score": 0.0,
+    "grade": "F",
+    "assessment": "Failure - Critical security risk"
   },
   "severity_distribution": {
     "critical": 1,

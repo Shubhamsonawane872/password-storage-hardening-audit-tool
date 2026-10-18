@@ -213,27 +213,21 @@ Example:
 ALGORITHM SYNTHESIS: PRIMARY SCORE CALCULATION
 ═════════════════════════════════════════════════════════════════════════════════
 
-                         Algorithm Results
-        ┌──────────────────────────────────────────┐
-        │ CVSS: 8.7/10  → 87/100                   │
-        │ Weighted: 38.2/100                       │
-        │ Confidence: 65.3/100                     │
-        └──────────────────────────────────────────┘
-                         │
-                         ▼
-                    Weighted Average
-                    
-        PRIMARY_SCORE = (CVSS × 0.3) + (Weighted × 0.4) + (Confidence × 0.3)
-        
-        = (87 × 0.3) + (38.2 × 0.4) + (65.3 × 0.3)
-        = 26.1 + 15.28 + 19.59
-        = 60.97 → 61.0 / 100
+        Primary score uses finding severity counts only:
+        Score = clamp(100 - (critical × 40 + high × 25 + medium × 12
+                             + low × 5 + info × 1), 0, 100)
+        Confidence, file context, and supplementary scorers do not affect it.
+
+        Example counts:
+        1 critical + 1 high + 1 medium + 1 low + 1 info
+        Deductions = 40 + 25 + 12 + 5 + 1 = 83
+        Score = 100 - 83 = 17 / 100
         
                          │
                          ▼
                     Grade Assignment
         
-        61.0 → Grade C+ (Poor)
+        17 → Grade F (Failure)
         
                          │
                          ▼
@@ -266,7 +260,7 @@ Step 1: Run All 5 Algorithms
                          │
                          ▼
 Step 2: Calculate Primary Score
-        (Weighted average: 30% CVSS + 40% Weighted + 30% Confidence)
+        (Fixed severity deductions per finding; clamp to 0-100)
                          │
                          ▼
 Step 3: Generate Grade

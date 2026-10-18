@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Password Storage Hardening Audit Tool uses a **multi-algorithm scoring system** that provides transparent, accurate, and nuanced security assessments. Instead of relying on a single scoring method, we employ five complementary algorithms to give you a complete picture of your code's security posture.
+The Password Storage Hardening Audit Tool uses a finding-count-based primary score and grade. The CVSS-inspired, confidence, risk-level, weighted, and entropy results remain available as supplementary analysis; they do not change the stored primary score or grade.
 
 ---
 
@@ -166,13 +166,18 @@ Recommendation: Focus on auth.py first
 ### How the Primary Score is Calculated
 
 ```
-Primary Score = (CVSS_Score × 0.3 + Weighted_Score × 0.4 + Confidence_Score × 0.3)
+Primary Score = clamp(100 - total severity deductions, 0, 100)
 ```
 
-**Weights:**
-- 30% CVSS v3.1-Inspired (severity with context)
-- 40% Weighted Aggregate (traditional approach)
-- 30% Confidence-Weighted (reliability)
+| Finding severity | Deduction per finding |
+|------------------|-----------------------|
+| Critical | 40 |
+| High | 25 |
+| Medium | 12 |
+| Low | 5 |
+| Info | 1 |
+
+Each finding contributes once according to its severity. Confidence, file context, and supplementary algorithm scores do not affect this primary score. The existing letter-grade thresholds below are applied to the resulting score.
 
 ### Grade Scale
 
@@ -207,8 +212,8 @@ Risk Level            Critical
 Confidence-Weighted   52.1/100
 Entropy Risk          100 (concentrated)
 
-PRIMARY SCORE: 52.1
-GRADE: D (Critical)
+PRIMARY SCORE: 60.0
+GRADE: C+ (Poor)
 ```
 
 **Assessment:** Emergency action required. Single high-impact finding in critical area.
@@ -238,8 +243,8 @@ Risk Level            Low
 Confidence-Weighted   81.8/100
 Entropy Risk          45 (moderate spread)
 
-PRIMARY SCORE: 82.1
-GRADE: A- (Good)
+PRIMARY SCORE: 50.0
+GRADE: D (Critical)
 ```
 
 **Assessment:** Generally secure with minor improvements possible.
@@ -268,8 +273,8 @@ Risk Level            High
 Confidence-Weighted   42.1/100
 Entropy Risk          25 (concentrated)
 
-PRIMARY SCORE: 42.8
-GRADE: C+ (Poor)
+PRIMARY SCORE: 0.0
+GRADE: F (Failure)
 ```
 
 **Assessment:** High security risk requiring immediate attention.
@@ -293,9 +298,9 @@ GRADE: C+ (Poor)
   "timestamp": "2026-10-16T12:34:56.789Z",
   "scan_summary": {
     "total_findings": 8,
-    "overall_score": 65.3,
-    "grade": "C+",
-    "assessment": "Poor - High security risk"
+    "overall_score": 0.0,
+    "grade": "F",
+    "assessment": "Failure - Critical security risk"
   },
   "severity_distribution": {
     "critical": 1,

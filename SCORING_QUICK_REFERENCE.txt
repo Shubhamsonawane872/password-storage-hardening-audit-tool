@@ -19,7 +19,7 @@
    ├─ Deducts: Critical(-40), High(-25), Medium(-12), Low(-5)
    ├─ Adjusted by: Finding confidence scores
    ├─ Use for: Intuitive pass/fail grading
-   └─ Example: 65.3 = Failing, needs improvement
+   └─ Example: One high finding deducts 25 points (score 75, grade B+)
 
 3. 🎯 RISK LEVEL (Critical/High/Medium/Low/Info)
    ├─ Threshold-based categorical assessment
@@ -43,14 +43,14 @@
    └─ Example: "High concentration in auth.py - fix there first"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- YOUR PRIMARY SCORE = WEIGHTED AVERAGE OF ALL 5
+ YOUR PRIMARY SCORE = FIXED DEDUCTIONS BY FINDING SEVERITY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    30% CVSS v3.1-Inspired
-    40% Weighted Aggregate       } PRIMARY SCORE (0-100)
-    30% Confidence-Weighted
-    
-    Plus: Risk Level + Entropy analysis
+    Start at 100:
+    Critical -40 | High -25 | Medium -12 | Low -5 | Info -1
+    Clamp to 0-100, then use the grade scale below.
+    Confidence, context, and supplementary algorithms do not affect
+    the primary score or grade. Risk level and entropy remain supplemental.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  GRADE SCALE
@@ -112,9 +112,9 @@ INFO       1    Only informational                   ✅  INFO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Scan Results:
-├─ PRIMARY SCORE: 65.3 / 100
-├─ GRADE: C+ (Poor)
-├─ ASSESSMENT: High security risk
+├─ PRIMARY SCORE: 0 / 100
+├─ GRADE: F (Failure)
+├─ ASSESSMENT: Critical security risk
 │
 ├─ Findings: 8 total
 │  ├─ Critical: 1 🔴
@@ -208,7 +208,7 @@ Q: How often should I scan?
 A: After code changes. Quarterly minimum. Pre-deployment mandatory.
 
 Q: Which algorithm matters most?
-A: PRIMARY SCORE (weighted average). But read all 5 for context.
+A: The primary score is based on finding severities and counts. Read all five algorithms for supplementary context.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  DOCUMENTATION REFERENCES

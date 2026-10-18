@@ -414,7 +414,15 @@ class ComprehensiveScorer:
     3. Actionable recommendations
     4. Grade assignment (A-F)
     """
-    
+
+    PRIMARY_SEVERITY_DEDUCTIONS = {
+        "critical": 40,
+        "high": 25,
+        "medium": 12,
+        "low": 5,
+        "info": 1,
+    }
+
     def __init__(self):
         self.scorers = {
             "cvss": CVSSv3InspiredScorer(),
@@ -442,7 +450,7 @@ class ComprehensiveScorer:
             results[name] = scorer.calculate(findings)
         
         # Calculate primary metrics
-        overall_score = self._calculate_primary_score(results)
+        overall_score = self._calculate_primary_score(findings)
         grade = self._calculate_grade(overall_score)
         recommendations = self._generate_recommendations(findings, results)
         
@@ -464,25 +472,15 @@ class ComprehensiveScorer:
         
         return report
     
-    def _calculate_primary_score(self, results: Dict) -> float:
-        """Calculate primary score (weighted average of algorithms)"""
-        scores = []
-        
-        # CVSS average (0-10 -> 0-100)
-        if "cvss" in results and "average_score" in results["cvss"]:
-            cvss_score = (results["cvss"]["average_score"] / 10.0) * 100
-            scores.append(cvss_score * 0.3)  # 30% weight
-        
-        # Weighted aggregate (already 0-100)
-        if "weighted" in results and "score" in results["weighted"]:
-            scores.append(results["weighted"]["score"] * 0.4)  # 40% weight
-        
-        # Confidence-weighted
-        if "confidence" in results and "score" in results["confidence"]:
-            scores.append(results["confidence"]["score"] * 0.3)  # 30% weight
-        
-        primary_score = sum(scores) if scores else 100
-        return round(primary_score, 1)
+    def _calculate_primary_score(self, findings: List[Dict]) -> float:
+        """Deduct fixed points for each finding based only on its severity."""
+        deductions = sum(
+            self.PRIMARY_SEVERITY_DEDUCTIONS.get(
+                finding.get("severity", "medium"), 12
+            )
+            for finding in findings
+        )
+        return round(max(0.0, min(100.0, 100.0 - deductions)), 1)
     
     def _calculate_grade(self, score: float) -> str:
         """Convert score to letter grade"""
@@ -594,14 +592,18 @@ class ComprehensiveScorer:
         """Generate detailed breakdown for understanding"""
         return {
             "methodology": {
-                "primary_score": "Weighted average (30% CVSS, 40% Aggregate, 30% Confidence)",
+                "primary_score": (
+                    "100 minus fixed severity deductions per finding "
+                    "(critical 40, high 25, medium 12, low 5, info 1); "
+                    "clamped to 0-100. Confidence and context do not affect it."
+                ),
                 "grade_scale": "A+ (90-100), A (85-89), A- (80-84), B+ (75-79), B (70-74), "
                                "B- (65-69), C+ (60-64), C (55-59), D (50-54), F (<50)",
                 "algorithms_used": list(self.scorers.keys()),
             },
             "how_to_read": {
-                "overall_score": "Primary metric (0-100) balancing multiple assessment methods",
-                "grade": "Letter grade equivalent for easy communication",
+                "overall_score": "Primary metric based only on finding counts and severities",
+                "grade": "Letter grade from the primary severity-deduction score",
                 "cvss_score": "Max CVSS-like severity (0-10) considering confidence and context",
                 "weighted_score": "Score based on severity and confidence weighting",
                 "risk_level": "Categorical risk assessment (Critical/High/Medium/Low/Info)",

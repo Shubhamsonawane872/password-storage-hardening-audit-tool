@@ -4,6 +4,10 @@
 
 The Password Audit Tool v2.0 now features a **comprehensive multi-algorithm scoring system** that provides transparent, accurate, and actionable security assessments.
 
+### Current Primary Grade Rule
+
+The stored score starts at 100 and deducts 40 per critical, 25 per high, 12 per medium, 5 per low, and 1 per info finding, clamped to 0–100. The existing letter-grade thresholds are applied to that score. Confidence, file context, and supplementary scoring algorithms do not affect the stored score or grade.
+
 ---
 
 ## What Was Delivered
@@ -44,7 +48,7 @@ The Password Audit Tool v2.0 now features a **comprehensive multi-algorithm scor
 
 - **File:** `app/scoring.py` → `ComprehensiveScorer` class
 - Combines all 5 algorithms
-- Calculates primary score (weighted average: 30% CVSS + 40% Weighted + 30% Confidence)
+- Calculates primary score from fixed severity deductions per finding
 - Generates letter grades (A+ to F)
 - Creates actionable recommendations
 - Explains methodology
@@ -69,11 +73,11 @@ POST /api/scanner/upload
 **Response Example:**
 ```json
 {
-  "security_score": 65.3,
-  "security_grade": "C+",
+  "security_score": 0.0,
+  "security_grade": "F",
   "scoring_details": {
     "algorithms_used": ["cvss", "weighted", "risk_level", "confidence", "entropy"],
-    "assessment": "Poor - High security risk"
+    "assessment": "Failure - Critical security risk"
   },
   "recommendations": [
     "URGENT: Address 1 critical vulnerability(ies) immediately",
@@ -192,9 +196,9 @@ POST /api/scanner/upload
   
   "scan_summary": {
     "total_findings": 8,
-    "overall_score": 65.3,
-    "grade": "C+",
-    "assessment": "Poor - High security risk"
+    "overall_score": 0.0,
+    "grade": "F",
+    "assessment": "Failure - Critical security risk"
   },
   
   "severity_distribution": {
@@ -272,11 +276,11 @@ curl -X POST http://127.0.0.1:5000/api/scanner/upload \
   "scan_id": 42,
   "files_scanned": 1,
   "findings": 6,
-  "security_score": 45.3,
-  "security_grade": "C+",
+  "security_score": 0.0,
+  "security_grade": "F",
   "scoring_details": {
     "algorithms_used": ["cvss", "weighted", "risk_level", "confidence", "entropy"],
-    "assessment": "Poor - High security risk"
+    "assessment": "Failure - Critical security risk"
   },
   "recommendations": [
     "URGENT: Address 1 critical vulnerability(ies) immediately",
@@ -410,16 +414,15 @@ for algo_name, algo_result in report['algorithm_results'].items():
 ## Primary Score Calculation
 
 ```
-PRIMARY SCORE = (CVSS_Avg × 0.3 + Weighted_Score × 0.4 + Confidence_Score × 0.3)
-
-Where:
-  CVSS_Avg: Average of CVSS scores (converted to 0-100 scale)
-  Weighted_Score: 0-100 deduction model
-  Confidence_Score: Confidence-adjusted 0-100 score
+PRIMARY SCORE = clamp(
+  100 - (critical × 40 + high × 25 + medium × 12 + low × 5 + info × 1),
+  0,
+  100
+)
 
 Result: 0-100 scale
 Grade: A+ to F
-Assessment: Text description
+Assessment: Text description of the grade
 Recommendations: Prioritized list
 ```
 
