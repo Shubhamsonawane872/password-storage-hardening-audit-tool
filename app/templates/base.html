@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -142,10 +142,9 @@
     localStorage.setItem(key, t);
   }
 
-  // On load: honour saved pref or system pref
+  // On load: honour saved preference; use the green-black theme by default
   const saved  = localStorage.getItem(key);
-  const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  applyTheme(saved || prefers);
+  applyTheme(saved || 'dark');
 
   btn.addEventListener('click', () => {
     applyTheme(html.dataset.theme === 'dark' ? 'light' : 'dark');

@@ -146,7 +146,7 @@ const SEV_COLORS = {
   high:     '#ea580c',
   medium:   '#ca8a04',
   low:      '#16a34a',
-  info:     '#0284c7',
+  info:     '#16a34a',
 };
 
 function getCSSVar(name) {
@@ -247,8 +247,8 @@ function buildTrend(data) {
         {
           label: 'Scans',
           data: scans,
-          borderColor: '#5b6cf9',
-          backgroundColor: 'rgba(91,108,249,.08)',
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22,163,74,.08)',
           fill: false,
           tension: .35,
           pointRadius: 3,
@@ -294,7 +294,7 @@ function buildRuleChart(dist) {
       datasets: [{
         label: 'Findings',
         data: top.map(r => r.count),
-        backgroundColor: top.map(r => SEV_COLORS[r.severity] || '#5b6cf9'),
+        backgroundColor: top.map(r => SEV_COLORS[r.severity] || '#16a34a'),
         borderRadius: 4,
         borderSkipped: false,
       }],
