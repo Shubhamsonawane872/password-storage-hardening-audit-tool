@@ -107,7 +107,7 @@ def export_csv(scan_id):
     db.close()
     
     # Generate CSV
-    csv_report = ReportGenerator.generate_csv(findings)
+    csv_report = ReportGenerator.generate_csv(findings, dict(scan))
     
     # Create response
     response = send_file(

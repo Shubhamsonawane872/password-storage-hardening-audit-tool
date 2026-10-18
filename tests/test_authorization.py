@@ -67,7 +67,7 @@ def test_user_cannot_delete_other_users_scan(app, client):
     db_path = app.config["DATABASE_PATH"]
 
     client.post("/api/auth/register", json={
-        "name": "Alice2", "email": "alice2_idor@example.com",
+        "name": "Alice Two", "email": "alice2_idor@example.com",
         "password": "Alice2Pass1!", "confirm_password": "Alice2Pass1!",
     })
     conn = sqlite3.connect(db_path)
@@ -85,7 +85,7 @@ def test_user_cannot_delete_other_users_scan(app, client):
 
     # Log in as Bob
     client.post("/api/auth/register", json={
-        "name": "Bob2", "email": "bob2_idor@example.com",
+        "name": "Bob Two", "email": "bob2_idor@example.com",
         "password": "Bob2Pass1!", "confirm_password": "Bob2Pass1!",
     })
     client.post("/api/auth/login", json={
@@ -112,6 +112,19 @@ def test_admin_can_access_admin_endpoints(admin_client):
     for path in ["/api/admin/users", "/api/admin/stats"]:
         r = admin_client.get(path)
         assert r.status_code == 200, f"{path} returned {r.status_code}"
+
+
+def test_admin_can_activate_and_deactivate_another_user(app, client, admin_client):
+    client.post("/api/auth/register", json={
+        "name": "Target User", "email": "target@example.com",
+        "password": "TargetPass1!", "confirm_password": "TargetPass1!",
+    })
+    from app.db import get_db_connection
+    db = get_db_connection(app.config["DATABASE_PATH"])
+    target_id = db.execute("SELECT id FROM users WHERE email=?", ("target@example.com",)).fetchone()["id"]
+    db.close()
+    assert admin_client.post(f"/api/admin/user/{target_id}/deactivate").status_code == 200
+    assert admin_client.post(f"/api/admin/user/{target_id}/activate").status_code == 200
 
 
 def test_logout_invalidates_session(client):

@@ -26,21 +26,21 @@
         <button class="btn btn-ghost btn-sm" onclick="exportFmt('html')">⬇ HTML</button>
         <button class="btn btn-ghost btn-sm" onclick="exportFmt('csv')">⬇ CSV</button>
       </div>
+      <a href="/scan" class="btn btn-primary btn-sm">Scan another file</a>
       <button class="btn btn-danger btn-sm" onclick="askDelete()">🗑 Delete</button>
       <a href="/history" class="btn btn-ghost btn-sm">← History</a>
     </div>
   </div>
 
   <section class="results-overview" aria-label="Scan summary">
-    <div class="results-grade" id="scoreBox">
-      <span class="grade-badge" id="stGrade" aria-label="Security grade">—</span>
+    <div class="results-grade">
+      <div class="score-circle grade-A" id="scoreBox" aria-label="Security score and grade">
+        <span class="grade-badge" id="stGrade" aria-label="Security grade">—</span>
+        <strong><span id="stScore">—</span><small> / 100</small></strong>
+      </div>
       <div>
         <div class="results-grade-label">Security grade</div>
         <div class="results-assessment" id="gradeAssessment">Calculating result…</div>
-      </div>
-      <div class="results-score">
-        <span class="results-grade-label">Score</span>
-        <strong><span id="stScore">—</span><small> / 100</small></strong>
       </div>
       <div class="results-total">
         <strong id="stTotal">—</strong>
@@ -61,8 +61,12 @@
       <h2>Scan findings</h2>
       <p id="filterSummary" aria-live="polite"></p>
     </div>
-    <button class="btn btn-ghost btn-sm" id="toggleInfoBtn" type="button"
-            onclick="toggleInfoFindings()" hidden>Show informational</button>
+    <div class="flex gap-2">
+      <button class="btn btn-ghost btn-sm" id="toggleInfoBtn" type="button"
+              onclick="toggleInfoFindings()" hidden>Show informational</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="setFileGroups(true)">Expand all</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="setFileGroups(false)">Collapse all</button>
+    </div>
   </div>
 
   <div class="filters results-filters">
@@ -135,7 +139,7 @@ let _all       = [];   // all findings fetched
 let _filtered  = [];
 let _page      = 1;
 let _perPage   = 20;
-let _includeInfo = false;
+let _includeInfo = true;
 
 const SEV_ORDER = { critical:1, high:2, medium:3, low:4, info:5 };
 
@@ -153,7 +157,7 @@ async function init() {
     const infoCount = _all.filter(f => f.severity === 'info').length;
     const infoButton = document.getElementById('toggleInfoBtn');
     infoButton.hidden = infoCount === 0;
-    infoButton.textContent = `Show informational (${infoCount})`;
+    infoButton.textContent = `Hide informational (${infoCount})`;
     _all.sort((a, b) =>
       (SEV_ORDER[a.severity] || 9) - (SEV_ORDER[b.severity] || 9) ||
       (a.line_number || 0) - (b.line_number || 0)
@@ -191,6 +195,7 @@ function populateHeader(scan) {
     const gEl   = document.getElementById('stGrade');
     gEl.textContent = grade;
     gEl.className   = `grade-badge grade-${grade.charAt(0)}`;
+    document.getElementById('scoreBox').className = `score-circle grade-${grade.charAt(0)}`;
     document.getElementById('gradeAssessment').textContent = gradeAssessment(grade);
   } else {
     document.getElementById('stScore').textContent = '—';
@@ -201,16 +206,11 @@ function populateHeader(scan) {
 
 function gradeAssessment(grade) {
   const descriptions = {
-    'A+': 'No scored security issues found',
-    'A': 'Very good — minor issues to review',
-    'A-': 'Good — review low-risk issues',
-    'B+': 'Fair — address identified issues',
-    'B': 'Some security improvements needed',
-    'B-': 'Review and fix the reported issues',
-    'C+': 'Needs improvement',
-    'C': 'Significant issues need attention',
-    'D': 'High impact — prioritize remediation',
-    'F': 'Very high impact — prioritize remediation',
+    'A': 'Strong score — continue the secure practices',
+    'B': 'Good score — review the reported improvements',
+    'C': 'Needs improvement — address the reported findings',
+    'D': 'High risk — prioritize remediation',
+    'F': 'Critical risk — remediate immediately',
   };
   return descriptions[grade] || 'Assessment unavailable';
 }
@@ -267,9 +267,9 @@ function resetFilters() {
     const el = document.getElementById(id);
     el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
   });
-  _includeInfo = false;
+  _includeInfo = true;
   const infoCount = _all.filter(f => f.severity === 'info').length;
-  document.getElementById('toggleInfoBtn').textContent = `Show informational (${infoCount})`;
+  document.getElementById('toggleInfoBtn').textContent = `Hide informational (${infoCount})`;
   applyFilters();
 }
 
@@ -299,21 +299,30 @@ function renderFindings(findings) {
     el.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">${onlyInformational || !_all.length ? '✅' : '🔎'}</div>
-        <div class="empty-title">${onlyInformational || !_all.length ? 'No security issues found' : 'No findings match your filters'}</div>
+        <div class="empty-title">${onlyInformational || !_all.length ? 'No issues found in the supported files scanned' : 'No findings match your filters'}</div>
         <div class="empty-desc">${onlyInformational ? 'Only informational checks were reported. Your score is not reduced by these checks.' : 'Try changing or clearing the filters.'}</div>
         ${onlyInformational ? `<button class="btn btn-ghost" onclick="toggleInfoFindings()">Show informational checks</button>` : `<button class="btn btn-ghost" onclick="resetFilters()">Clear filters</button>`}
       </div>`;
     return;
   }
 
-  el.innerHTML = findings.map(f => {
+  const groups = findings.reduce((result, finding) => {
+    const file = finding.file_name || 'unknown';
+    (result[file] ||= []).push(finding);
+    return result;
+  }, {});
+  el.innerHTML = Object.entries(groups).map(([file, fileFindings]) => `
+    <details class="findings-file" open>
+      <summary>${escapeHtml(file)} <span>${fileFindings.length} finding${fileFindings.length === 1 ? '' : 's'}</span></summary>
+      <div class="findings-file-list">${fileFindings.map(f => {
     const conf    = Math.round((f.confidence ?? 0) * 100);
+    const isGood = f.rule_id === 'PWD007';
 
     return `
-    <div class="finding-card sev-${f.severity}">
+    <article class="finding-card sev-${f.severity} ${isGood ? 'good-practice' : ''}">
       <div class="finding-heading">
         <div class="finding-title">${escapeHtml(f.rule_id)}: ${escapeHtml(f.rule_title)}</div>
-        <span class="badge badge-${f.severity}">${f.severity.toUpperCase()}</span>
+        <span class="badge badge-${f.severity}">${isGood ? 'GOOD PRACTICE' : f.severity.toUpperCase()}</span>
       </div>
 
       <div class="finding-meta">
@@ -323,12 +332,17 @@ function renderFindings(findings) {
 
       <p class="finding-body">${escapeHtml(f.description || '')}</p>
       <details class="finding-details">
-        <summary>View evidence and recommendation</summary>
-        ${f.evidence ? `<div class="finding-evidence">${escapeHtml(f.evidence)}</div>` : ''}
-        ${f.recommendation ? `<div class="finding-rec"><strong>Fix:</strong> ${escapeHtml(f.recommendation)}</div>` : ''}
+        <summary>Why it's risky and how to fix</summary>
+        ${f.evidence ? `<pre class="finding-evidence"><code><mark>${escapeHtml(f.evidence)}</mark></code></pre>` : ''}
+        ${f.recommendation ? `<div class="finding-rec"><strong>${isGood ? 'Good practice:' : 'How to fix:'}</strong> ${escapeHtml(f.recommendation)}</div>` : ''}
       </details>
-    </div>`;
-  }).join('');
+    </article>`;
+  }).join('')}</div>
+    </details>`).join('');
+}
+
+function setFileGroups(expanded) {
+  document.querySelectorAll('.findings-file').forEach(group => { group.open = expanded; });
 }
 
 // ── Pagination ────────────────────────────────────────────────────────

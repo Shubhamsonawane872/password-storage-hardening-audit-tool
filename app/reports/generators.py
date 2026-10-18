@@ -1,5 +1,8 @@
 """Report generators for JSON, HTML, and CSV formats"""
 import json
+import csv
+import io
+from html import escape
 from datetime import datetime
 
 
@@ -18,7 +21,10 @@ class ReportGenerator:
                 'completed_at': scan['completed_at'],
                 'total_files_scanned': scan['total_files_scanned'],
                 'total_findings': scan['total_findings'],
+                'security_score': scan.get('security_score'),
+                'security_grade': scan.get('security_grade'),
                 'severity_breakdown': {
+                    'critical': scan['critical_count'],
                     'high': scan['high_count'],
                     'medium': scan['medium_count'],
                     'low': scan['low_count'],
@@ -205,7 +211,7 @@ class ReportGenerator:
         <div class="scan-info-grid">
             <div class="info-item">
                 <div class="info-label">Filename</div>
-                <div class="info-value">{scan['original_filename']}</div>
+                <div class="info-value">{escape(str(scan['original_filename'] or ''))}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">Scan Date</div>
@@ -219,12 +225,16 @@ class ReportGenerator:
                 <div class="info-label">Total Findings</div>
                 <div class="info-value">{scan['total_findings']}</div>
             </div>
+            <div class="info-item">
+                <div class="info-label">Security Score / Grade</div>
+                <div class="info-value">{scan.get('security_score', '—')} / 100 · {escape(str(scan.get('security_grade') or '—'))}</div>
+            </div>
         </div>
         
         <h3 style="margin-top: 20px; margin-bottom: 15px;">Severity Breakdown</h3>
         <div class="severity-stats">
             <div class="severity-stat stat-critical">
-                Critical: {scan['high_count']}
+                Critical: {scan['critical_count']}
             </div>
             <div class="severity-stat stat-high">
                 High: {scan['high_count']}
@@ -256,14 +266,14 @@ class ReportGenerator:
             for finding in section_findings:
                 html += f"""
         <div class="finding finding-{severity}">
-            <div class="finding-title">{finding['rule_id']}: {finding['rule_title']}</div>
+                <div class="finding-title">{escape(str(finding['rule_id']))}: {escape(str(finding['rule_title']))}</div>
             <div class="finding-meta">
-                File: <strong>{finding['file_name']}</strong> | 
-                Line: <strong>{finding['line_number']}</strong>
+                File: <strong>{escape(str(finding['file_name'] or ''))}</strong> |
+                Line: <strong>{escape(str(finding['line_number'] or ''))}</strong>
             </div>
-            <div class="finding-description">{finding['description']}</div>
-            <div class="evidence"><strong>Evidence:</strong><br>{finding['evidence']}</div>
-            <div class="recommendation"><strong>Recommendation:</strong><br>{finding['recommendation']}</div>
+            <div class="finding-description">{escape(str(finding['description'] or ''))}</div>
+            <div class="evidence"><strong>Evidence:</strong><br>{escape(str(finding['evidence'] or ''))}</div>
+            <div class="recommendation"><strong>Recommendation:</strong><br>{escape(str(finding['recommendation'] or ''))}</div>
         </div>
 """
             
@@ -283,27 +293,17 @@ class ReportGenerator:
         return html
     
     @staticmethod
-    def generate_csv(findings):
+    def generate_csv(findings, scan=None):
         """Generate CSV report"""
-        csv_lines = [
-            'Rule ID,Title,Severity,File,Line,Evidence,Description,Recommendation'
-        ]
-        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        score = scan.get('security_score') if scan else ''
+        grade = scan.get('security_grade') if scan else ''
+        writer.writerow(['Security Score', 'Security Grade', 'Rule ID', 'Title', 'Severity', 'File', 'Line', 'Evidence', 'Description', 'Recommendation'])
+        if not findings:
+            writer.writerow([score, grade, '', '', '', '', '', '', '', ''])
         for finding in findings:
-            # Escape quotes and newlines
-            evidence = finding['evidence'].replace('"', '""').replace('\n', ' ')
-            description = finding['description'].replace('"', '""').replace('\n', ' ')
-            recommendation = finding['recommendation'].replace('"', '""').replace('\n', ' ')
-            
-            line = (f'"{finding["rule_id"]}","'
-                   f'{finding["rule_title"]}","'
-                   f'{finding["severity"]}","'
-                   f'{finding["file_name"]}","'
-                   f'{finding["line_number"]}","'
-                   f'{evidence}","'
-                   f'{description}","'
-                   f'{recommendation}"')
-            
-            csv_lines.append(line)
-        
-        return '\n'.join(csv_lines)
+            writer.writerow([score, grade, *[finding.get(key, '') for key in (
+                'rule_id', 'rule_title', 'severity', 'file_name', 'line_number',
+                'evidence', 'description', 'recommendation')]])
+        return output.getvalue()

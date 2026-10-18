@@ -1,7 +1,6 @@
 """Machine Learning-based vulnerability analyzer"""
 import re
 from typing import List, Dict, Tuple
-import numpy as np
 
 
 class MLVulnerabilityAnalyzer:

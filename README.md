@@ -49,7 +49,7 @@ Scan results come from static checks against the submitted source; uploaded code
 - **Database**: SQLite 3
 - **Password Hashing**: Argon2id (via argon2-cffi)
 - **Testing**: pytest
-- **Security**: CSRF protection, rate limiting, secure cookies
+- **Security**: Login attempt throttling, secure cookie flags, input validation
 
 ## Project Structure
 
@@ -119,7 +119,7 @@ password-storage-audit/
 
 ### 1. Prerequisites
 
-Ensure you have Python 3.8+ installed. Download from: https://www.python.org/downloads/
+Ensure you have Python 3.10+ installed. Download from: https://www.python.org/downloads/
 
 Verify installation:
 ```powershell
@@ -276,7 +276,7 @@ pytest tests/ --cov=app
 
 ✅ **Session Security**
 - HttpOnly cookies (JavaScript cannot access)
-- SameSite=Lax (CSRF protection)
+- SameSite=Lax cookie attribute (this is a browser cookie policy and does not provide CSRF token validation)
 - Secure flag for HTTPS (configurable)
 - Session timeout (1 hour default)
 
@@ -381,7 +381,7 @@ The test suite includes:
 - ✅ Scanner pattern detection
 - ✅ File upload restrictions
 - ✅ Authorization checks
-- ✅ CSRF protection
+- Login throttling (5 failed attempts per client IP in a five-minute window)
 - ✅ Ownership verification (IDOR prevention)
 
 Run all tests:
@@ -412,7 +412,7 @@ pytest tests/ -v --cov=app
 │  │ Security:                   │    │
 │  │ - Argon2id hashing          │    │
 │  │ - Rate limiting             │    │
-│  │ - CSRF protection           │    │
+│  │ - SameSite cookie policy    │    │
 │  │ - Input validation          │    │
 │  └─────────────────────────────┘    │
 │  ┌─────────────────────────────┐    │
@@ -448,8 +448,8 @@ pytest tests/ -v --cov=app
 - Flask (Python web framework) with modular blueprint architecture
 - SQLite database with proper schema design
 - Argon2id password hashing (OWASP recommended)
-- Static code analysis using regex patterns and Python AST
-- Comprehensive security controls (CSRF, rate limiting, input validation)
+- Static code analysis using regex patterns and Python AST for Python files
+- Login throttling, ownership checks, and input validation
 
 **Why It's Secure**:
 - Passwords hashed with Argon2id, never stored plaintext

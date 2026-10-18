@@ -221,6 +221,7 @@ function renderTable(scans) {
       <td><span class="badge badge-${s.scan_status}">${s.scan_status}</span></td>
       <td style="text-align:center;">${s.total_files_scanned ?? 0}</td>
       <td style="text-align:center;font-weight:600;">${s.total_findings ?? 0}</td>
+      <td style="text-align:center;font-weight:600;">${s.security_score == null ? '—' : Math.round(s.security_score)}</td>
       <td style="text-align:center;">${critBadge}</td>
       <td style="text-align:center;">${highBadge}</td>
       <td style="text-align:center;">${grade}</td>
@@ -242,6 +243,7 @@ function renderTable(scans) {
           <th>Status</th>
           <th style="text-align:center;">Files</th>
           <th style="text-align:center;">Findings</th>
+          <th style="text-align:center;">Score</th>
           <th style="text-align:center;">Critical</th>
           <th style="text-align:center;">High</th>
           <th style="text-align:center;">Grade</th>

@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import ast
 import base64
+import io
 import math
 import re
+import tokenize
 from pathlib import Path
 from typing import List, Dict
 
@@ -37,9 +39,23 @@ _HASH_SAFE_KEYWORDS = frozenset([
 ])
 
 _MODERN_HASH_RE = re.compile(
-    r'\b(argon2|bcrypt|scrypt|pbkdf2|Argon2id|PasswordHasher)\b',
+    r'\b(argon2(?:id)?|bcrypt|scrypt|pbkdf2(?:_hmac)?|PasswordHasher|'
+    r'BCryptPasswordEncoder|password_hash)\b',
     re.IGNORECASE,
 )
+
+
+def _is_modern_hash_usage(line: str) -> bool:
+    """Require an import/declaration or hashing API call, not a variable mention."""
+    if not _MODERN_HASH_RE.search(line):
+        return False
+    if re.search(r'\b(import|from|use)\b', line, re.IGNORECASE):
+        return True
+    return bool(re.search(
+        r'\b(?:hashpw|gensalt|checkpw|hash|verify|scrypt|pbkdf2(?:_hmac)?|'
+        r'password_hash|PasswordHasher|BCryptPasswordEncoder)\s*\(',
+        line, re.IGNORECASE,
+    ))
 
 
 def _shannon_entropy(value: str) -> float:
@@ -114,6 +130,7 @@ class CodeScanner:
         re.compile(r"\$password\s*=\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
         re.compile(r"passwd\s*=\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
         re.compile(r"\bpwd\s*=\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
+        re.compile(r"\bINSERT\s+INTO\b.*\bpassword\b", re.IGNORECASE),
     ]
 
     # PWD002 – MD5   (fixed: now covers ALL md5 forms including hashlib.md5)
@@ -214,6 +231,8 @@ class CodeScanner:
         """
         ext = Path(filename).suffix.lstrip(".").lower()
         lines = content.splitlines()
+        scan_lines = (self._python_code_lines(content, lines) if ext == "py"
+                      else self._non_python_code_lines(content, ext))
         findings: List[Dict] = []
 
         # --- Python AST pre-pass (deeper analysis, Python only) ---------------
@@ -221,7 +240,7 @@ class CodeScanner:
             findings.extend(self._ast_scan(content, lines))
 
         # --- Line-by-line regex scan ------------------------------------------
-        for i, line in enumerate(lines):
+        for i, line in enumerate(scan_lines):
             if _is_comment(line, ext):
                 continue
 
@@ -267,7 +286,7 @@ class CodeScanner:
                     break
 
             # PWD007 – modern hashing (positive)
-            if _MODERN_HASH_RE.search(line):
+            if _is_modern_hash_usage(line):
                 findings.append(self._finding("PWD007", lineno, stripped, 0.99))
 
             # PWD008 – base64-encoded secret
@@ -318,7 +337,7 @@ class CodeScanner:
 
         # --- Entropy scan (file-level, only for non-test files) ----------------
         if not self._is_test_file(filename):
-            findings.extend(self._entropy_scan(lines, ext))
+            findings.extend(self._entropy_scan(scan_lines, ext))
 
         # AST, line-pattern, and entropy checks can flag the same source line.
         # Keep one auditable finding per rule and line, using the strongest match.
@@ -330,6 +349,95 @@ class CodeScanner:
                 unique_findings[key] = finding
 
         return list(unique_findings.values())
+
+    @staticmethod
+    def _python_code_lines(source: str, lines: list[str]) -> list[str]:
+        """Mask comments and docstrings so examples in prose are not findings."""
+        masked = [list(line) for line in lines]
+        try:
+            for token in tokenize.generate_tokens(io.StringIO(source).readline):
+                if token.type == tokenize.COMMENT:
+                    row, col = token.start
+                    end_row, end_col = token.end
+                    for r in range(row - 1, end_row):
+                        start = col if r == row - 1 else 0
+                        stop = end_col if r == end_row - 1 else len(masked[r])
+                        for c in range(start, min(stop, len(masked[r]))):
+                            masked[r][c] = " "
+        except (tokenize.TokenError, IndentationError):
+            pass
+        try:
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                body = getattr(node, "body", None)
+                if not isinstance(body, list) or not body:
+                    continue
+                first = body[0]
+                if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                        and isinstance(first.value.value, str)):
+                    for row in range(first.lineno - 1, getattr(first, "end_lineno", first.lineno)):
+                        masked[row] = [" "] * len(masked[row])
+        except SyntaxError:
+            pass
+        return ["".join(line) for line in masked]
+
+    @staticmethod
+    def _non_python_code_lines(source: str, ext: str) -> list[str]:
+        """Mask inline and block comments while preserving strings and line positions."""
+        chars = list(source)
+        quote = None
+        block_comment = False
+        line_comment = False
+        escaped = False
+        i = 0
+        while i < len(chars):
+            ch = chars[i]
+            nxt = chars[i + 1] if i + 1 < len(chars) else ""
+            if ch == "\n":
+                line_comment = False
+                escaped = False
+                i += 1
+                continue
+            if block_comment:
+                if ch == "*" and nxt == "/":
+                    chars[i] = chars[i + 1] = " "
+                    block_comment = False
+                    i += 2
+                    continue
+                if ch != "\r":
+                    chars[i] = " "
+                i += 1
+                continue
+            if line_comment:
+                if ch != "\r":
+                    chars[i] = " "
+                i += 1
+                continue
+            if quote:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == quote:
+                    quote = None
+                i += 1
+                continue
+            if ch in ("'", '"', '`'):
+                quote = ch
+                i += 1
+                continue
+            if ch == "/" and nxt == "*":
+                chars[i] = chars[i + 1] = " "
+                block_comment = True
+                i += 2
+                continue
+            if ch == "/" and nxt == "/" or (ext == "php" and ch == "#"):
+                line_comment = True
+                chars[i] = " "
+                i += 1
+                continue
+            i += 1
+        return "".join(chars).splitlines()
 
     # ── Private helpers ────────────────────────────────────────────────────────
 

@@ -65,7 +65,7 @@ def upload_scan():
         uploaded.save(temp_main)
 
         if safe_name.lower().endswith(".zip"):
-            ok, msg, extracted = _file_handler.extract_zip_safe(temp_main)
+            ok, msg, extracted = _file_handler.extract_zip_safe(temp_main, destination=temp_dir)
             if not ok:
                 raise ValueError(msg)
             temp_files.extend(extracted)
@@ -85,6 +85,9 @@ def upload_scan():
             ok, content = FileHandler.read_file_safe(filepath)
             if not ok:
                 raise ValueError(f"Could not scan {os.path.basename(filepath)}: {content}")
+
+            if not content.strip():
+                continue
 
             files_scanned += 1
             fname = os.path.basename(filepath)

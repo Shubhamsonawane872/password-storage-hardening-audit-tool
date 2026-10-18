@@ -416,11 +416,7 @@ class ComprehensiveScorer:
     """
 
     PRIMARY_SEVERITY_DEDUCTIONS = {
-        "critical": 40,
-        "high": 25,
-        "medium": 12,
-        "low": 5,
-        "info": 0,
+        "critical": 30, "high": 20, "medium": 10, "low": 5, "info": 0,
     }
 
     def __init__(self):
@@ -473,51 +469,37 @@ class ComprehensiveScorer:
         return report
     
     def _calculate_primary_score(self, findings: List[Dict]) -> float:
-        """Deduct fixed points for each finding based only on its severity."""
-        deductions = sum(
-            self.PRIMARY_SEVERITY_DEDUCTIONS.get(
-                finding.get("severity", "medium"), 12
-            )
-            for finding in findings
-        )
-        return round(max(0.0, min(100.0, 100.0 - deductions)), 1)
+        """Score each rule once so repeated matches cannot overwhelm the score."""
+        seen = set()
+        score = 100
+        for finding in findings:
+            rule_id = finding.get("rule_id")
+            if rule_id and rule_id in seen:
+                continue
+            if rule_id:
+                seen.add(rule_id)
+            if rule_id == "PWD007":
+                score += 5
+            else:
+                score -= self.PRIMARY_SEVERITY_DEDUCTIONS.get(finding.get("severity", "medium"), 10)
+        return round(max(0, min(100, score)), 1)
     
     def _calculate_grade(self, score: float) -> str:
         """Convert score to letter grade"""
-        if score >= 90:
-            return "A+"
-        elif score >= 85:
-            return "A"
-        elif score >= 80:
-            return "A-"
-        elif score >= 75:
-            return "B+"
-        elif score >= 70:
-            return "B"
-        elif score >= 65:
-            return "B-"
-        elif score >= 60:
-            return "C+"
-        elif score >= 55:
-            return "C"
-        elif score >= 50:
-            return "D"
-        else:
-            return "F"
+        if score >= 90: return "A"
+        if score >= 75: return "B"
+        if score >= 60: return "C"
+        if score >= 40: return "D"
+        return "F"
     
     def _get_assessment(self, grade: str) -> str:
         """Get textual assessment based on grade"""
         assessments = {
-            "A+": "Excellent - Minimal security risk",
-            "A": "Very Good - Low security risk",
-            "A-": "Good - Low-to-moderate security risk",
-            "B+": "Satisfactory - Moderate security risk",
-            "B": "Fair - Moderate security risk",
-            "B-": "Weak - Moderate-to-high security risk",
-            "C+": "Poor - High security risk",
-            "C": "Poor - High security risk",
-            "D": "Critical - Very high security risk",
-            "F": "Failure - Critical security risk"
+            "A": "Excellent - Minimal security risk",
+            "B": "Good - Review the reported improvements",
+            "C": "Needs improvement - Address the reported findings",
+            "D": "High risk - Prioritize remediation",
+            "F": "Critical risk - Remediate immediately",
         }
         return assessments.get(grade, "Unknown")
     
@@ -593,12 +575,10 @@ class ComprehensiveScorer:
         return {
             "methodology": {
                 "primary_score": (
-                    "100 minus fixed severity deductions per finding "
-                    "(critical 40, high 25, medium 12, low 5, info 0); "
-                    "clamped to 0-100. Confidence and context do not affect it."
+                    "Start at 100; deduct critical 30, high 20, medium 10, or low 5 "
+                    "once per rule ID; PWD007 adds 5; clamp to 0-100."
                 ),
-                "grade_scale": "A+ (90-100), A (85-89), A- (80-84), B+ (75-79), B (70-74), "
-                               "B- (65-69), C+ (60-64), C (55-59), D (50-54), F (<50)",
+                "grade_scale": "A (90-100), B (75-89), C (60-74), D (40-59), F (<40)",
                 "algorithms_used": list(self.scorers.keys()),
             },
             "how_to_read": {

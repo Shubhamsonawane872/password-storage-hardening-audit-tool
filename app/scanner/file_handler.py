@@ -3,7 +3,7 @@ import os
 import zipfile
 import tempfile
 import shutil
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from flask import current_app
 
 
@@ -44,7 +44,7 @@ class FileHandler:
         
         return True, "File size is valid"
     
-    def extract_zip_safe(self, zip_path: str) -> tuple[bool, str, list]:
+    def extract_zip_safe(self, zip_path: str, destination: str | None = None) -> tuple[bool, str, list]:
         """
         Safely extract a ZIP file
         
@@ -64,8 +64,15 @@ class FileHandler:
                     return False, f"Too many files in ZIP archive", []
                 
                 # Check for path traversal
-                for filename in file_list:
-                    if '..' in filename or filename.startswith('/'):
+                for info in zip_ref.infolist():
+                    filename = info.filename
+                    normalized = filename.replace('\\', '/')
+                    posix_path = PurePosixPath(normalized)
+                    windows_path = PureWindowsPath(filename)
+                    mode = info.external_attr >> 16
+                    if (posix_path.is_absolute() or windows_path.is_absolute()
+                            or windows_path.drive or '..' in posix_path.parts
+                            or (mode & 0o170000) == 0o120000):
                         return False, "Invalid path in ZIP file (path traversal detected)", []
                 
                 # Check total size after extraction
@@ -76,13 +83,24 @@ class FileHandler:
                     return False, f"Extracted files too large", []
                 
                 # Extract to temporary directory
-                temp_dir = tempfile.mkdtemp(prefix='audit_scan_')
-                self.temp_dirs.append(temp_dir)
+                temp_dir = (tempfile.mkdtemp(prefix='audit_scan_') if destination is None
+                            else os.path.join(destination, 'extracted'))
+                os.makedirs(temp_dir, exist_ok=True)
+                if destination is None:
+                    self.temp_dirs.append(temp_dir)
+                safe_root = Path(temp_dir).resolve()
                 
                 extracted_files = []
                 for filename in file_list:
                     if filename.endswith('/'):
                         continue  # Skip directories
+
+                    target = (safe_root / Path(*PurePosixPath(filename.replace('\\', '/')).parts)).resolve()
+                    try:
+                        target.relative_to(safe_root)
+                    except ValueError:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        return False, "Invalid path in ZIP file (path traversal detected)", []
                     
                     extracted_path = zip_ref.extract(filename, temp_dir)
                     extracted_files.append(extracted_path)

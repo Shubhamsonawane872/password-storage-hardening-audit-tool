@@ -125,6 +125,16 @@ def _create_schema(cursor: sqlite3.Cursor) -> None:
     _create_indexes(cursor)
 
 
+def create_schema(connection_or_cursor) -> None:
+    """Build the schema using an existing SQLite connection or cursor."""
+    cursor = (connection_or_cursor.cursor()
+              if isinstance(connection_or_cursor, sqlite3.Connection)
+              else connection_or_cursor)
+    _create_schema(cursor)
+    if isinstance(connection_or_cursor, sqlite3.Connection):
+        connection_or_cursor.commit()
+
+
 def _create_indexes(cursor: sqlite3.Cursor) -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scans_user_id        ON scans(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scans_status         ON scans(scan_status)")

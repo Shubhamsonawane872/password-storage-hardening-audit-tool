@@ -343,22 +343,20 @@ function renderScore(score, grade, improvement) {
   // Animate progress bar
   setTimeout(() => { barEl.style.width = `${score || 0}%`; }, 100);
 
-  // Colour bar by score
-  barEl.style.background =
-    score >= 80 ? 'var(--success)' :
-    score >= 60 ? 'var(--warning)' : 'var(--danger)';
+  // Match the score bar to the requested grade palette.
+  const gradeColors = { A: '#16a34a', B: '#65a30d', C: '#ca8a04', D: '#ea580c', F: '#dc2626' };
+  barEl.style.background = gradeColors[(grade || 'F').charAt(0)] || gradeColors.F;
 
   // Grade badge colour
   gradeEl.className = `grade-badge grade-${(grade||'F').replace('+','\\+')}`;
 
   // Message
   const msgs = {
-    'A+': 'Excellent — no critical issues found.',
     'A' : 'Very good security posture.',
-    'B' : 'Good, but some improvements possible.',
-    'C' : 'Fair — several issues need attention.',
-    'D' : 'Poor — significant vulnerabilities present.',
-    'F' : 'Critical issues must be resolved immediately.',
+    'B' : 'Good, but some improvements are needed.',
+    'C' : 'Needs improvement — address the reported findings.',
+    'D' : 'High risk — prioritize remediation.',
+    'F' : 'Critical risk — remediate immediately.',
   };
   msgEl.textContent = msgs[grade] || '';
 

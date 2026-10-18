@@ -210,6 +210,20 @@ def test_secret_mentioned_only_in_comment_is_not_reported():
     assert not findings
 
 
+def test_docstrings_and_inline_comments_are_not_scanned_as_code():
+    code = '''"""password = "documented but not stored"""\npassword_label = "Password"  # hashlib.md5(password)\n'''
+    assert scanner.scan_file("docs.py", code) == []
+
+
+@pytest.mark.parametrize("filename, code", [
+    ("comment.js", 'const note = "safe"; // CryptoJS.MD5(password);'),
+    ("comment.java", '/* BCryptPasswordEncoder() */'),
+    ("comment.php", '$note = "safe"; # password = "example-secret"'),
+])
+def test_non_python_inline_and_block_comments_are_ignored(filename, code):
+    assert scanner.scan_file(filename, code) == []
+
+
 # ── Rule registry completeness ────────────────────────────────────────────────
 
 def test_all_rules_have_required_fields():
