@@ -19,6 +19,8 @@ A complete, functional web application for auditing source code to identify inse
 - Supports Python, JavaScript, Java, and PHP
 - ZIP archive support with path traversal protection
 
+Scan results come from static checks against the submitted source; uploaded code is never executed. Each finding points to the matched file and line, and uploads with no readable supported source files are rejected rather than presented as clean scans. Static pattern checks are indicators for review, not proof of runtime exploitability.
+
 ✅ **Vulnerability Rules**
 - PWD001: Plaintext password storage (Critical)
 - PWD002: MD5 hashing (High)

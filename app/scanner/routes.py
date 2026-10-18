@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
-from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, request, session
 
@@ -14,17 +13,6 @@ from app.scanner.file_handler import FileHandler
 from app.scanner.patterns import CodeScanner
 from app.scanner.rules import get_rule
 from app.scoring import ComprehensiveScorer
-
-# Try to import ML analyzer; it's optional for basic functionality
-try:
-    from app.scanner.ml_analyzer import CodeQualityAnalyzer, MLVulnerabilityAnalyzer
-    _ml_analyzer = MLVulnerabilityAnalyzer()
-    _quality_analyzer = CodeQualityAnalyzer()
-    ML_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
-    _ml_analyzer = None
-    _quality_analyzer = None
-    ML_AVAILABLE = False
 
 scanner_bp = Blueprint("scanner", __name__, url_prefix="/api/scanner")
 
@@ -75,13 +63,14 @@ def upload_scan():
         temp_dir = tempfile.mkdtemp(prefix="audit_")
         temp_main = os.path.join(temp_dir, safe_name)
         uploaded.save(temp_main)
-        temp_files.append(temp_main)
 
         if safe_name.lower().endswith(".zip"):
             ok, msg, extracted = _file_handler.extract_zip_safe(temp_main)
             if not ok:
                 raise ValueError(msg)
             temp_files.extend(extracted)
+        else:
+            temp_files.append(temp_main)
 
         # ── Scan every supported file ─────────────────────────────────────────
         all_findings: list[dict] = []
@@ -95,43 +84,20 @@ def upload_scan():
 
             ok, content = FileHandler.read_file_safe(filepath)
             if not ok:
-                continue
+                raise ValueError(f"Could not scan {os.path.basename(filepath)}: {content}")
 
             files_scanned += 1
             fname = os.path.basename(filepath)
 
-            # regex + AST scan
             raw = _code_scanner.scan_file(fname, content)
 
-            # ML context-aware confidence adjustment
             for finding in raw:
                 finding["file_name"] = fname
                 finding["in_test_context"] = False
-                if _ml_analyzer is not None:
-                    ln = finding.get("line_number", 1)
-                    ctx = _ml_analyzer.analyze_code_context(content, ln, "")
-                    multiplier = ctx["context_analysis"].get("multiplier", 1.0)
-                    finding["confidence"] = round(
-                        min(finding.get("confidence", 0.8) * multiplier, 1.0), 3
-                    )
-                    finding["in_test_context"] = ctx["context_analysis"].get("in_test", False)
-
-            # Entropy-based additional secrets (supplement regex)
-            secret_hits = (
-                _ml_analyzer.detect_secret_patterns(content)
-                if _ml_analyzer is not None else []
-            )
-            for hit in secret_hits:
-                all_findings.append({
-                    "rule_id": "PWD004",
-                    "line_number": None,
-                    "evidence": hit.get("evidence", "[REDACTED]"),
-                    "confidence": hit.get("confidence", 0.9),
-                    "file_name": fname,
-                    "in_test_context": False,
-                })
-
             all_findings.extend(raw)
+
+        if files_scanned == 0:
+            raise ValueError("No readable supported source files were found to scan")
 
         # ── Count severities (separate critical vs high) ──────────────────────
         counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
@@ -231,7 +197,8 @@ def upload_scan():
         )
         db.commit()
         db.close()
-        return jsonify({"error": "Scan failed", "detail": str(exc)}), 500
+        status_code = 400 if isinstance(exc, ValueError) else 500
+        return jsonify({"error": "Scan failed", "detail": str(exc)}), status_code
 
     finally:
         # ── Always delete the entire temp directory ───────────────────────────

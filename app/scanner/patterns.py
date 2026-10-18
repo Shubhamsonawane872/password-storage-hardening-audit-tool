@@ -142,7 +142,10 @@ class CodeScanner:
 
     # PWD005 – unsalted SHA-2
     _P005 = [
-        re.compile(r"hashlib\.sha(256|512)\s*\([^,)]+\)\.hexdigest\(\)", re.IGNORECASE),
+        re.compile(
+            r"hashlib\.sha(256|512)\s*\(.*\bpassword\b.*\)\.hexdigest\(\)",
+            re.IGNORECASE,
+        ),
         re.compile(r"CryptoJS\.SHA(256|512)\s*\([^,]+\)", re.IGNORECASE),
         re.compile(r"hash\s*\(\s*['\"]sha(256|512)['\"]\s*,\s*\$password", re.IGNORECASE),
     ]
@@ -151,6 +154,10 @@ class CodeScanner:
     _P006 = [
         re.compile(r"hashlib\.(sha224|sha384|sha3_|blake2|new\s*\(['\"]sha)", re.IGNORECASE),
         re.compile(r"passlib\.hash\.(md5|sha1|des_crypt)", re.IGNORECASE),
+        re.compile(
+            r"from\s+passlib\.hash\s+import\s+.*\b(md5|sha1|des_crypt)(?:_crypt)?\b",
+            re.IGNORECASE,
+        ),
         re.compile(r"\bcrypt\.crypt\s*\(", re.IGNORECASE),          # Python crypt()
         re.compile(r"CRC32\s*\(", re.IGNORECASE),
     ]
@@ -177,7 +184,8 @@ class CodeScanner:
 
     # PWD011 – PBKDF2 with low iteration count (< 100 000)
     _P011 = re.compile(
-        r'pbkdf2[_\w]*\s*\([^)]*?(\d{1,5})[^)]*?\)',
+        r'(?:(?:pbkdf2_hmac\s*\([^,]+,[^,]+,[^,]+,)|'
+        r'(?:pbkdf2\s*\([^,]+,[^,]+,))\s*(?P<iterations>\d+)\b',
         re.IGNORECASE,
     )
 
@@ -246,7 +254,7 @@ class CodeScanner:
 
             # PWD005 – unsalted SHA-2
             for pat in self._P005:
-                if pat.search(line):
+                if pat.search(line) and not re.search(r"\bsalt\b", line, re.IGNORECASE):
                     conf = _context_confidence(lines, i, 0.91)
                     findings.append(self._finding("PWD005", lineno, stripped, conf))
                     break
@@ -286,7 +294,7 @@ class CodeScanner:
             m = self._P011.search(line)
             if m:
                 try:
-                    iters = int(m.group(1))
+                    iters = int(m.group("iterations"))
                     if iters < 100_000:
                         conf = _context_confidence(lines, i, 0.90)
                         findings.append(
@@ -310,9 +318,18 @@ class CodeScanner:
 
         # --- Entropy scan (file-level, only for non-test files) ----------------
         if not self._is_test_file(filename):
-            findings.extend(self._entropy_scan(lines))
+            findings.extend(self._entropy_scan(lines, ext))
 
-        return findings
+        # AST, line-pattern, and entropy checks can flag the same source line.
+        # Keep one auditable finding per rule and line, using the strongest match.
+        unique_findings: dict[tuple[str, int], Dict] = {}
+        for finding in findings:
+            key = (finding["rule_id"], finding["line_number"])
+            previous = unique_findings.get(key)
+            if previous is None or finding["confidence"] > previous["confidence"]:
+                unique_findings[key] = finding
+
+        return list(unique_findings.values())
 
     # ── Private helpers ────────────────────────────────────────────────────────
 
@@ -411,7 +428,7 @@ class CodeScanner:
 
     # ── Entropy-based secret scanner ───────────────────────────────────────────
 
-    def _entropy_scan(self, lines: list[str]) -> List[Dict]:
+    def _entropy_scan(self, lines: list[str], ext: str) -> List[Dict]:
         """
         Flag high-entropy string literals adjacent to sensitive variable names
         that weren't caught by the keyword patterns above.
@@ -420,7 +437,7 @@ class CodeScanner:
         assignment_re = re.compile(r"""(['"])([A-Za-z0-9+/!@#$%^&*_\-=.]{12,})\1""")
 
         for i, line in enumerate(lines):
-            if not _SECRET_NAMES.search(line):
+            if _is_comment(line, ext) or not _SECRET_NAMES.search(line):
                 continue
             for m in assignment_re.finditer(line):
                 val = m.group(2)

@@ -69,6 +69,12 @@ def test_PWD005_unsalted_sha256():
     assert "PWD005" in ids
 
 
+def test_PWD005_does_not_flag_salted_sha256():
+    code = "h = hashlib.sha256((password + salt).encode()).hexdigest()"
+    ids = rule_ids(scanner.scan_file("store.py", code))
+    assert "PWD005" not in ids
+
+
 def test_PWD006_passlib_md5():
     code = "from passlib.hash import md5_crypt"
     ids = rule_ids(scanner.scan_file("auth.py", code))
@@ -186,6 +192,22 @@ def test_confidence_score_present():
     findings = scanner.scan_file("app.py", code)
     for f in findings:
         assert 0.0 <= f.get("confidence", -1) <= 1.0
+
+
+def test_each_finding_is_traceable_and_not_duplicated():
+    code = 'password = "known-secret-value"'
+    findings = scanner.scan_file("app.py", code)
+    plaintext_findings = [f for f in findings if f["rule_id"] == "PWD004"]
+
+    assert len(plaintext_findings) == 1
+    assert plaintext_findings[0]["line_number"] == 1
+    assert "[REDACTED]" in plaintext_findings[0]["evidence"]
+
+
+def test_secret_mentioned_only_in_comment_is_not_reported():
+    code = '# API_KEY = "sk_live_ABCDEFGHIJ1234567890"'
+    findings = scanner.scan_file("app.py", code)
+    assert not findings
 
 
 # ── Rule registry completeness ────────────────────────────────────────────────

@@ -1,6 +1,8 @@
 """Security-focused tests — hashing, policy, route protection."""
 from __future__ import annotations
 
+from io import BytesIO
+
 import pytest
 
 from app.auth.utils import hash_password, validate_password, verify_password
@@ -83,6 +85,44 @@ def test_dashboard_requires_auth(client):
 def test_scanner_upload_requires_auth(client):
     r = client.post("/api/scanner/upload", data={})
     assert r.status_code == 401
+
+
+def test_scan_reports_only_traceable_findings_from_uploaded_code(auth_client):
+    source = b'# unrelated example: password = "not scanned"\npassword = "real-secret-value"'
+    response = auth_client.post(
+        "/api/scanner/upload",
+        data={"file": (BytesIO(source), "submitted.py")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    scan_id = response.get_json()["scan_id"]
+    result = auth_client.get(f"/api/scanner/scan/{scan_id}").get_json()
+    findings = result["findings"]
+
+    assert findings
+    assert all(f["file_name"] == "submitted.py" for f in findings)
+    assert all(f["line_number"] is not None for f in findings)
+    assert all(f["line_number"] == 2 for f in findings)
+    assert len([f for f in findings if f["rule_id"] == "PWD004"]) == 1
+
+
+def test_scan_rejects_archive_with_no_supported_source_files(auth_client):
+    import zipfile
+
+    archive = BytesIO()
+    with zipfile.ZipFile(archive, "w") as zip_file:
+        zip_file.writestr("notes.txt", "not source code")
+    archive.seek(0)
+
+    response = auth_client.post(
+        "/api/scanner/upload",
+        data={"file": (archive, "empty-scan.zip")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert "No readable supported source files" in response.get_json()["detail"]
 
 
 def test_admin_route_blocks_regular_user(client):
