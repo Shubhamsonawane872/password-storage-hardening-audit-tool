@@ -18,13 +18,29 @@ def rule_ids(findings):
 def test_PWD001_plaintext_python():
     code = 'password = "PlainTextSecret"'
     ids = rule_ids(scanner.scan_file("app.py", code))
-    assert "PWD001" in ids
+    assert "PWD001" not in ids
+    assert ids == ["PWD004"]
 
 
 def test_PWD001_php_dollar_sign():
     code = '$password = "myplaintextpass";'
     ids = rule_ids(scanner.scan_file("auth.php", code))
-    assert "PWD001" in ids
+    assert "PWD001" not in ids
+    assert "PWD004" in ids
+
+
+def test_PWD001_python_database_write_and_stored_comparison():
+    insert = 'cursor.execute("INSERT INTO users (password) VALUES (?)", (password,))'
+    compare = 'return users_database.get(username) == password'
+    assert "PWD001" in rule_ids(scanner.scan_file("auth.py", insert))
+    assert "PWD001" in rule_ids(scanner.scan_file("auth.py", compare))
+
+
+def test_PWD001_model_field_requires_save_operation():
+    assignment = "user.password = password"
+    saved = "user.password = password\nuser.save()"
+    assert "PWD001" not in rule_ids(scanner.scan_file("model.py", assignment))
+    assert "PWD001" in rule_ids(scanner.scan_file("model.py", saved))
 
 
 def test_PWD002_hashlib_md5():
@@ -138,6 +154,47 @@ def test_PWD013_password_logged():
     assert "PWD013" in ids
 
 
+def test_PWD013_ignores_password_word_in_output_text():
+    assert scanner.scan_file("secure.py", 'print("Password Storage: Argon2id")') == []
+
+
+def test_PWD013_flags_only_password_variable_as_output_argument():
+    findings = scanner.scan_file("secure.py", 'print(password)')
+    assert rule_ids(findings) == ["PWD013"]
+
+
+def test_PWD013_does_not_flag_password_nested_in_verification_call():
+    code = 'print("Password verification:", verify_password(password, hashed_password))'
+    assert scanner.scan_file("secure.py", code) == []
+
+
+def test_PWD013_flags_password_in_f_string():
+    findings = scanner.scan_file("secure.py", 'logger.info(f"Login password={pwd}")')
+    assert rule_ids(findings) == ["PWD013"]
+
+
+@pytest.mark.parametrize("filename, code, expected", [
+    ("app.js", "console.log(password);", ["PWD013"]),
+    ("app.js", 'console.log("Password Storage: Argon2id");', []),
+    ("app.js", "console.log(verifyPassword(password, digest));", []),
+])
+def test_PWD013_non_python_output_checks_are_conservative(filename, code, expected):
+    assert rule_ids(scanner.scan_file(filename, code)) == expected
+
+
+def test_placeholder_secret_in_sample_is_reported_as_low():
+    findings = scanner.scan_file("sample_apps/demo.py", 'password = "changeme"')
+    assert len(findings) == 1
+    assert findings[0]["rule_id"] == "PWD004"
+    assert findings[0]["severity"] == "low"
+
+
+def test_PWD007_reports_once_per_algorithm_not_per_import_and_constructor():
+    code = "from argon2 import PasswordHasher\nhasher = PasswordHasher()\nh = hasher.hash(password)"
+    findings = scanner.scan_file("secure.py", code)
+    assert len([finding for finding in findings if finding["rule_id"] == "PWD007"]) == 1
+
+
 # ── False-positive suppression ────────────────────────────────────────────────
 
 def test_no_PWD001_when_value_is_hash():
@@ -171,7 +228,7 @@ def test_vulnerable_sample_triggers_expected_rules():
 # ── Line numbers and redaction ────────────────────────────────────────────────
 
 def test_line_number_accuracy():
-    code = "line1\nline2\npassword = 'secret'\nline4"
+    code = 'line1\nline2\ncursor.execute("INSERT INTO users (password) VALUES (?)", (password,))\nline4'
     findings = scanner.scan_file("test.py", code)
     pwd001 = [f for f in findings if f["rule_id"] == "PWD001"]
     assert pwd001, "PWD001 not found"

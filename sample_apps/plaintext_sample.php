@@ -1,3 +1,3 @@
 <?php
-$sql = "INSERT INTO users (password) VALUES (?)";
+$pdo->prepare("INSERT INTO users (password) VALUES (?)")->execute([$password]);
 ?>

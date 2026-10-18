@@ -106,7 +106,7 @@ def upload_scan():
         counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
         for f in all_findings:
             rule = get_rule(f["rule_id"])
-            sev = rule["severity"] if rule else "low"
+            sev = f.get("severity", rule["severity"] if rule else "low")
             counts[sev] = counts.get(sev, 0) + 1
 
         # ── Prepare findings for comprehensive scoring ──────────────────────────
@@ -115,7 +115,7 @@ def upload_scan():
             rule = get_rule(f["rule_id"]) or {}
             scoring_findings.append({
                 "rule_id": f["rule_id"],
-                "severity": rule.get("severity", "low"),
+                "severity": f.get("severity", rule.get("severity", "low")),
                 "confidence": f.get("confidence", 0.8),
                 "file_name": f.get("file_name", "unknown"),
                 "context": {
@@ -171,7 +171,7 @@ def upload_scan():
                     scan_id,
                     f["rule_id"],
                     rule.get("title", f["rule_id"]),
-                    rule.get("severity", "low"),
+                    f.get("severity", rule.get("severity", "low")),
                     f.get("file_name"),
                     f.get("line_number"),
                     f.get("evidence", ""),

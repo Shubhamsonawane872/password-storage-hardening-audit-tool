@@ -124,13 +124,24 @@ class CodeScanner:
     # ── Pre-compiled patterns ─────────────────────────────────────────────────
 
     # PWD001 – plaintext storage
-    _P001 = [
-        re.compile(r"password\s*=\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
-        re.compile(r"password\s*:\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
-        re.compile(r"\$password\s*=\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
-        re.compile(r"passwd\s*=\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
-        re.compile(r"\bpwd\s*=\s*['\"][^'\"]{3,}['\"]", re.IGNORECASE),
-        re.compile(r"\bINSERT\s+INTO\b.*\bpassword\b", re.IGNORECASE),
+    # PWD001 is deliberately limited to storage/write operations or a
+    # plaintext comparison. A local assignment is handled by PWD004 instead.
+    _P001_STORAGE = [
+        re.compile(
+            r"\b(?:execute\w*|executemany|query|prepare)\s*\(.*"
+            r"\b(?:insert\s+into|update)\b.*\b(?:password|passwd|pwd)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:write|writelines|json\.dump|json_encode)\s*\([^)]*"
+            r"\b(?:password|passwd|pwd)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:stored_)?(?:password|passwd|pwd)\b\s*==\s*"
+            r"(?:\w+\.get\s*\(|\w+\.(?:password|passwd|pwd)\b|stored_)",
+            re.IGNORECASE,
+        ),
     ]
 
     # PWD002 – MD5   (fixed: now covers ALL md5 forms including hashlib.md5)
@@ -152,7 +163,7 @@ class CodeScanner:
         re.compile(r"api[_-]?key\s*[=:]\s*['\"][^'\"]{10,}['\"]", re.IGNORECASE),
         re.compile(r"secret\s*[=:]\s*['\"][^'\"]{10,}['\"]", re.IGNORECASE),
         re.compile(r"token\s*[=:]\s*['\"][^'\"]{20,}['\"]", re.IGNORECASE),
-        re.compile(r"password\s*[=:]\s*['\"][A-Za-z0-9!@#$%^&*]{8,}['\"]", re.IGNORECASE),
+        re.compile(r"(?:password|passwd|pwd)\s*[=:]\s*['\"][^'\"]{8,}['\"]", re.IGNORECASE),
         # Stripe / GitHub / AWS-style tokens
         re.compile(r"sk_(live|test)_[A-Za-z0-9]{20,}", re.IGNORECASE),
         re.compile(r"AKIA[0-9A-Z]{16}"),
@@ -218,12 +229,8 @@ class CodeScanner:
         re.compile(r'rot13|caesar\s+cipher', re.IGNORECASE),
     ]
 
-    # PWD013 – password printed / logged
-    _P013 = re.compile(
-        r'(print|console\.log|logger\.(debug|info|warning|error|critical)|'
-        r'logging\.(debug|info|warning|error|critical))\s*\(.*?password',
-        re.IGNORECASE,
-    )
+    # PWD013 for Python is AST-only. Non-Python languages use a narrower
+    # argument matcher in _non_python_password_logged.
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -236,6 +243,9 @@ class CodeScanner:
         lines = content.splitlines()
         scan_lines = (self._python_code_lines(content, lines) if ext == "py"
                       else self._non_python_code_lines(content, ext))
+        saved_model_names = {name.lower() for name in re.findall(
+            r"\$?([A-Za-z_]\w*)\s*(?:->|\.)\s*save\s*\(", content, re.IGNORECASE
+        )} if ext != "py" else set()
         findings: List[Dict] = []
 
         # --- Python AST pre-pass (deeper analysis, Python only) ---------------
@@ -250,12 +260,21 @@ class CodeScanner:
             lineno = i + 1          # 1-indexed for reporting
             stripped = line.strip()
 
-            # PWD001 – plaintext
-            for pat in self._P001:
-                if pat.search(line) and not _looks_safe(line):
-                    conf = _context_confidence(lines, i, 0.88)
-                    findings.append(self._finding("PWD001", lineno, stripped, conf))
-                    break
+            # PWD001 – non-Python storage calls and stored-value comparisons.
+            # Python is analyzed structurally in _ast_scan.
+            model_field_assignment = re.search(
+                r"\$?([A-Za-z_]\w*)\s*(?:->|\.)\s*(?:password|passwd|pwd)\s*=\s*\$?"
+                r"(password|passwd|pwd)\b",
+                line, re.IGNORECASE,
+            )
+            saved_model_password = bool(
+                model_field_assignment
+                and model_field_assignment.group(1).lower() in saved_model_names
+            )
+            if (ext != "py" and (saved_model_password or any(
+                    pat.search(line) for pat in self._P001_STORAGE))):
+                conf = _context_confidence(lines, i, 0.88)
+                findings.append(self._finding("PWD001", lineno, stripped, conf))
 
             # PWD002 – MD5
             if self._P002.search(line):
@@ -269,9 +288,15 @@ class CodeScanner:
 
             # PWD004 – hardcoded secret
             for pat in self._P004:
-                if pat.search(line):
+                match = pat.search(line)
+                if match:
                     conf = _context_confidence(lines, i, 0.93)
-                    findings.append(self._finding("PWD004", lineno, _redact(stripped), conf))
+                    finding = self._finding("PWD004", lineno, _redact(stripped), conf)
+                    literal = re.search(r"['\"]([^'\"]*)['\"]", match.group(0))
+                    if (literal and literal.group(1).strip().lower() in {"changeme", "change_me"}
+                            and re.search(r"(?:sample|test)", filename, re.IGNORECASE)):
+                        finding["severity"] = "low"
+                    findings.append(finding)
                     break
 
             # PWD005 – unsalted SHA-2
@@ -333,8 +358,8 @@ class CodeScanner:
                     findings.append(self._finding("PWD012", lineno, stripped, conf))
                     break
 
-            # PWD013 – password logged
-            if self._P013.search(line):
+            # PWD013 – non-Python only; Python uses AST argument analysis.
+            if ext != "py" and self._non_python_password_logged(line, ext):
                 conf = _context_confidence(lines, i, 0.92)
                 findings.append(self._finding("PWD013", lineno, _redact(stripped), conf))
 
@@ -345,13 +370,21 @@ class CodeScanner:
         # AST, line-pattern, and entropy checks can flag the same source line.
         # Keep one auditable finding per rule and line, using the strongest match.
         unique_findings: dict[tuple[str, int], Dict] = {}
+        modern_algorithms: dict[str, Dict] = {}
         for finding in findings:
+            if finding["rule_id"] == "PWD007":
+                algorithm = self._modern_hash_algorithm(finding["evidence"])
+                previous = modern_algorithms.get(algorithm)
+                # Prefer a hashing/verification call over an import line.
+                if previous is None or _is_modern_hash_usage(finding["evidence"]):
+                    modern_algorithms[algorithm] = finding
+                continue
             key = (finding["rule_id"], finding["line_number"])
             previous = unique_findings.get(key)
             if previous is None or finding["confidence"] > previous["confidence"]:
                 unique_findings[key] = finding
 
-        return list(unique_findings.values())
+        return list(unique_findings.values()) + list(modern_algorithms.values())
 
     @staticmethod
     def _python_code_lines(source: str, lines: list[str]) -> list[str]:
@@ -467,6 +500,88 @@ class CodeScanner:
         except Exception:
             return False
 
+    @staticmethod
+    def _python_password_logged(node: ast.Call) -> bool:
+        """Match secret variables passed directly to an output call.
+
+        Nested calls such as ``print(verify_password(password, digest))`` are
+        intentionally ignored: their result, not the password, is printed.
+        """
+        func = node.func
+        if isinstance(func, ast.Name):
+            output_call = func.id.lower() == "print"
+        elif isinstance(func, ast.Attribute):
+            method = func.attr.lower()
+            base = func.value
+            logger_base = (
+                isinstance(base, ast.Name)
+                and (base.id.lower() in {"logger", "log", "logging", "console"}
+                     or base.id.lower().endswith("logger"))
+            ) or (isinstance(base, ast.Attribute) and base.attr.lower() == "logger")
+            logger_factory = (
+                isinstance(base, ast.Call)
+                and isinstance(base.func, ast.Attribute)
+                and base.func.attr.lower() == "getlogger"
+            )
+            output_call = (
+                method == "log" and logger_base
+            ) or (
+                method in {"debug", "info", "warning", "error", "critical", "exception"}
+                and (logger_base or logger_factory)
+            )
+        else:
+            output_call = False
+        if not output_call:
+            return False
+
+        def secret_name(name: str) -> bool:
+            return bool(_SECRET_NAMES.search(name))
+
+        for arg in node.args:
+            if isinstance(arg, ast.Name) and secret_name(arg.id):
+                return True
+            if isinstance(arg, ast.JoinedStr):
+                for value in arg.values:
+                    if (isinstance(value, ast.FormattedValue)
+                            and isinstance(value.value, ast.Name)
+                            and secret_name(value.value.id)):
+                        return True
+        return False
+
+    @staticmethod
+    def _modern_hash_algorithm(evidence: str) -> str:
+        lower = evidence.lower()
+        if "argon" in lower or "passwordhasher" in lower:
+            return "argon2"
+        if "bcrypt" in lower:
+            return "bcrypt"
+        if "scrypt" in lower:
+            return "scrypt"
+        if "pbkdf2" in lower:
+            return "pbkdf2"
+        return "password_hash"
+
+    @staticmethod
+    def _non_python_password_logged(line: str, ext: str) -> bool:
+        """Conservative output-call check for JS, Java, and PHP source."""
+        call = re.search(
+            r"(?:console\s*\.\s*log|logger\s*\.\s*(?:debug|info|warning|error|critical)"
+            r"|logging\s*\.\s*(?:debug|info|warning|error|critical)|"
+            r"System\s*\.\s*out\s*\.\s*print(?:ln)?|error_log|print_r|print)\s*\((.*)\)",
+            line, re.IGNORECASE,
+        )
+        if not call:
+            return False
+        args = call.group(1)
+        # A variable in a template interpolation is direct output in JS.
+        interpolation_names = re.findall(r"\$\{\s*([A-Za-z_$][\w$]*)\s*\}", args)
+        # Drop quoted literals so prose such as "password is safe" is ignored.
+        without_literals = re.sub(r"(['\"`])(?:\\.|(?!\1)[^\\])*?\1", " ", args)
+        without_literals = re.sub(r"\b\w+\s*\([^()]*\)", " ", without_literals)
+        direct_names = re.findall(r"(?<![\w.$])([A-Za-z_$][\w$]*)(?![\w$])", without_literals)
+        names = direct_names + interpolation_names
+        return any(_SECRET_NAMES.search(name) for name in names)
+
     # ── AST-based Python scanner ───────────────────────────────────────────────
 
     def _ast_scan(self, source: str, lines: list[str]) -> List[Dict]:
@@ -480,7 +595,89 @@ class CodeScanner:
         except SyntaxError:
             return results
 
+        saved_models = {
+            ast.unparse(node.func.value)
+            for node in ast.walk(tree)
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr.lower() == "save" and hasattr(ast, "unparse"))
+        }
+
         for node in ast.walk(tree):
+            # Passwords are plaintext only when they are written to a storage
+            # API/model field or compared against a stored value.
+            if isinstance(node, ast.Call):
+                func_name = self._ast_func_name(node) or ""
+                call_text = ast.unparse(node) if hasattr(ast, "unparse") else ""
+                sql_api = func_name.lower() in {
+                    "execute", "executemany", "query", "prepare",
+                }
+                other_storage_api = func_name.lower() in {
+                    "write", "writelines", "dump", "json_encode",
+                }
+                sql_write = bool(re.search(
+                    r"\b(?:insert\s+into|update)\b.*\b(?:password|passwd|pwd)\b",
+                    call_text, re.IGNORECASE,
+                ))
+                sensitive_arg = any(
+                    isinstance(child, ast.Name) and _SECRET_NAMES.search(child.id)
+                    for arg in node.args for child in ast.walk(arg)
+                )
+                if (sql_api and sql_write) or (other_storage_api and sensitive_arg):
+                    results.append(self._finding(
+                        "PWD001", node.lineno,
+                        lines[node.lineno - 1].strip() if node.lineno <= len(lines) else call_text,
+                        0.88,
+                    ))
+
+                if self._python_password_logged(node):
+                    results.append(self._finding(
+                        "PWD013", node.lineno,
+                        lines[node.lineno - 1].strip() if node.lineno <= len(lines) else call_text,
+                        0.92,
+                    ))
+
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    value_is_secret = isinstance(node.value, ast.Name) and bool(
+                        _SECRET_NAMES.search(node.value.id)
+                    )
+                    target_text = ast.unparse(target) if hasattr(ast, "unparse") else ""
+                    model_field_saved = (
+                        isinstance(target, ast.Attribute)
+                        and bool(_SECRET_NAMES.search(target.attr))
+                        and (ast.unparse(target.value) if hasattr(ast, "unparse") else "") in saved_models
+                    )
+                    sensitive_mapping = (
+                        isinstance(target, ast.Subscript)
+                        and bool(re.search(r"user|account|database|store|credential", target_text, re.I))
+                    )
+                    if (model_field_saved or sensitive_mapping) and value_is_secret:
+                        results.append(self._finding(
+                            "PWD001", node.lineno, lines[node.lineno - 1].strip(), 0.88
+                        ))
+
+            if isinstance(node, ast.Compare):
+                operands = [node.left, *node.comparators]
+                if any(isinstance(op, ast.Eq) for op in node.ops):
+                    has_password = any(
+                        isinstance(op, ast.Name) and _SECRET_NAMES.search(op.id)
+                        for op in operands
+                    )
+                    has_stored_value = any(
+                        isinstance(op, ast.Call) and self._ast_func_name(op) == "get"
+                        or isinstance(op, ast.Attribute) and bool(
+                            re.search(r"user|stored|database|record|account", op.attr, re.I)
+                        )
+                        or isinstance(op, ast.Name) and bool(
+                            re.search(r"stored|database|users|record|account", op.id, re.I)
+                        )
+                        for op in operands
+                    )
+                    if has_password and has_stored_value:
+                        results.append(self._finding(
+                            "PWD001", node.lineno, lines[node.lineno - 1].strip(), 0.88
+                        ))
+
             # Detect password/secret string constants assigned to sensitive names
             if isinstance(node, ast.Assign):
                 for target in node.targets:

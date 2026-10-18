@@ -36,6 +36,21 @@ def test_only_modern_hashing_adds_five_points():
     assert (result["overall_score"], result["grade"]) == (100, "A")
 
 
+def test_modern_hashing_bonus_is_once_per_file():
+    one_file = score([
+        {"rule_id": "PWD004", "severity": "high", "file_name": "secure.py"},
+        {"rule_id": "PWD007", "severity": "info", "file_name": "secure.py"},
+        {"rule_id": "PWD007", "severity": "info", "file_name": "secure.py"},
+    ])
+    two_files = score([
+        {"rule_id": "PWD004", "severity": "high", "file_name": "secure.py"},
+        {"rule_id": "PWD007", "severity": "info", "file_name": "secure.py"},
+        {"rule_id": "PWD007", "severity": "info", "file_name": "other.py"},
+    ])
+    assert (one_file["overall_score"], one_file["grade"]) == (85, "B")
+    assert (two_files["overall_score"], two_files["grade"]) == (90, "A")
+
+
 def test_score_is_clamped():
     result = score([
         {"rule_id": f"PWD{i:03d}", "severity": "critical"}

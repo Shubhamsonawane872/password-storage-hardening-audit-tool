@@ -469,19 +469,23 @@ class ComprehensiveScorer:
         return report
     
     def _calculate_primary_score(self, findings: List[Dict]) -> float:
-        """Score each rule once so repeated matches cannot overwhelm the score."""
+        """Cap deductions per rule and award PWD007 once per source file."""
         seen = set()
+        modern_hash_files = set()
         score = 100
         for finding in findings:
             rule_id = finding.get("rule_id")
+            if rule_id == "PWD007":
+                file_name = finding.get("file_name") or "<single-file>"
+                if file_name not in modern_hash_files:
+                    score += 5
+                    modern_hash_files.add(file_name)
+                continue
             if rule_id and rule_id in seen:
                 continue
             if rule_id:
                 seen.add(rule_id)
-            if rule_id == "PWD007":
-                score += 5
-            else:
-                score -= self.PRIMARY_SEVERITY_DEDUCTIONS.get(finding.get("severity", "medium"), 10)
+            score -= self.PRIMARY_SEVERITY_DEDUCTIONS.get(finding.get("severity", "medium"), 10)
         return round(max(0, min(100, score)), 1)
     
     def _calculate_grade(self, score: float) -> str:
@@ -576,7 +580,7 @@ class ComprehensiveScorer:
             "methodology": {
                 "primary_score": (
                     "Start at 100; deduct critical 30, high 20, medium 10, or low 5 "
-                    "once per rule ID; PWD007 adds 5; clamp to 0-100."
+                    "once per rule ID; PWD007 adds 5 once per file; clamp to 0-100."
                 ),
                 "grade_scale": "A (90-100), B (75-89), C (60-74), D (40-59), F (<40)",
                 "algorithms_used": list(self.scorers.keys()),

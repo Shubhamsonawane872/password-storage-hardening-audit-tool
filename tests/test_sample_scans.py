@@ -15,6 +15,7 @@ SAMPLES = {
     "unsalted_sha256.py": ({"PWD005"}, 80, "B"),
     "hardcoded_secret.py": ({"PWD004"}, 80, "B"),
     "safe_hashing.py": ({"PWD007"}, 100, "A"),
+    "secure.py": ({"PWD007"}, 100, "A"),
     "comment_only.py": (set(), 100, "A"),
     "irrelevant.py": (set(), 100, "A"),
 }
@@ -57,6 +58,44 @@ def test_scanning_same_sample_twice_is_deterministic():
     scanner = CodeScanner()
     content = path.read_text(encoding="utf-8")
     assert scanner.scan_file(path.name, content) == scanner.scan_file(path.name, content)
+
+
+def test_secure_sample_with_hardcoded_password_has_only_pwd004_and_stays_b_or_c():
+    scanner = CodeScanner()
+    scorer = ComprehensiveScorer()
+    content = (Path("sample_apps") / "secure.py").read_text(encoding="utf-8")
+    content = content.replace(
+        'os.environ.get("DEMO_PASSWORD") or getpass.getpass("Password: ")',
+        '"StrongPassword@2026"',
+    )
+    findings = scanner.scan_file("secure.py", content)
+    assert {finding["rule_id"] for finding in findings} == {"PWD004", "PWD007"}
+    score_input = [
+        {"rule_id": finding["rule_id"],
+         "severity": finding.get("severity", get_rule(finding["rule_id"])["severity"]),
+         "file_name": "secure.py"}
+        for finding in findings
+    ]
+    summary = scorer.score_all(score_input)["scan_summary"]
+    assert summary["overall_score"] == 85
+    assert summary["grade"] == "B"
+
+
+def test_vulnerable_sample_still_receives_grade_f():
+    path = Path("sample_apps/vulnerable_sample.py")
+    scanner = CodeScanner()
+    scorer = ComprehensiveScorer()
+    findings = scanner.scan_file(path.name, path.read_text(encoding="utf-8"))
+    assert {"PWD001", "PWD002", "PWD003", "PWD004", "PWD005"}.issubset(
+        {finding["rule_id"] for finding in findings}
+    )
+    summary = scorer.score_all([
+        {"rule_id": finding["rule_id"],
+         "severity": finding.get("severity", get_rule(finding["rule_id"])["severity"]),
+         "file_name": path.name}
+        for finding in findings
+    ])["scan_summary"]
+    assert (summary["overall_score"], summary["grade"]) == (0, "F")
 
 
 def test_zip_scan_keeps_findings_separated_by_source_file(auth_client):

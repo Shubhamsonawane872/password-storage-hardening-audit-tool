@@ -5,8 +5,9 @@ RULES: dict = {
     "PWD001": {
         "title": "Possible plaintext password storage",
         "description": (
-            "Detected code that may store or compare passwords in plaintext "
-            "without hashing. Storing plaintext passwords means any database "
+            "Detected code that writes a raw password to a database, file, or "
+            "model field, or compares it with a stored value in plaintext. "
+            "Storing plaintext passwords means any database "
             "breach immediately exposes every user's password."
         ),
         "severity": "critical",
@@ -188,8 +189,8 @@ RULES: dict = {
     "PWD013": {
         "title": "Password logged or printed to output",
         "description": (
-            "A password or credential variable appears in a print(), "
-            "console.log(), logger call, or similar output statement. "
+            "A password or credential variable is passed directly to a print, "
+            "console.log, logger call, or similar output statement. "
             "Logged passwords end up in log files, monitoring systems, and "
             "crash reports — significantly expanding the attack surface."
         ),
