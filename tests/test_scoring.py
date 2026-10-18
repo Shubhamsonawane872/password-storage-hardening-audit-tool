@@ -1,6 +1,34 @@
 """Tests for finding-count-based primary security scores and grades."""
 
+import pytest
+
 from app.scoring import ComprehensiveScorer
+
+
+@pytest.mark.parametrize(
+    ("severities", "expected_score", "expected_grade"),
+    [
+        ([], 100, "A+"),
+        (["medium"], 88, "A"),
+        (["low"] * 4, 80, "A-"),
+        (["high"], 75, "B+"),
+        (["high", "info"], 74, "B"),
+        (["low"] * 7, 65, "B-"),
+        (["critical"], 60, "C+"),
+        (["critical", "info"], 59, "C"),
+        (["high"] * 2, 50, "D"),
+        (["critical"] * 2, 20, "F"),
+    ],
+)
+def test_severity_combinations_produce_expected_score_and_grade(
+    severities, expected_score, expected_grade
+):
+    findings = [{"severity": severity} for severity in severities]
+
+    summary = ComprehensiveScorer().score_all(findings)["scan_summary"]
+
+    assert summary["overall_score"] == expected_score
+    assert summary["grade"] == expected_grade
 
 
 def test_primary_score_uses_fixed_deduction_per_finding():
