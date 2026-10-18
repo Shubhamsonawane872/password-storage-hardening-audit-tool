@@ -1,6 +1,6 @@
 # Comprehensive Scoring System - Live Examples
 
-> **Current primary score rule:** start at 100 and deduct 40 per critical, 25 per high, 12 per medium, 5 per low, and 1 per info finding; clamp to 0–100 and apply the existing grade scale. Supplementary algorithms, context, and confidence do not affect the primary score or grade.
+> **Current primary score rule:** start at 100 and deduct 40 per critical, 25 per high, 12 per medium, and 5 per low finding; informational findings have no deduction. Clamp to 0–100 and apply the existing grade scale. Supplementary algorithms, context, and confidence do not affect the primary score or grade.
 
 ## Quick Start: Understanding Your Score
 

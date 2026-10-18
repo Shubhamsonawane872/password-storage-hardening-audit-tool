@@ -65,15 +65,24 @@
     <!-- Progress area (shown during upload/scan) -->
     <div id="progressArea" class="hidden mt-2" style="text-align:center;">
       <div class="spinner" style="margin:0 auto 12px;"></div>
-      <div id="progressMsg" style="font-size:14px;color:var(--text2);">Uploading…</div>
-      <div class="progress mt-1">
-        <div class="progress-fill" id="progressFill" style="width:0%;transition:width .4s ease;"></div>
-      </div>
+      <div id="progressMsg" style="font-size:14px;color:var(--text2);">Uploading and scanning your code…</div>
     </div>
 
     <!-- Result area (shown after completion) -->
     <div id="resultArea" class="hidden mt-2">
-      <div class="alert alert-success" id="resultAlert"></div>
+      <div class="upload-result" id="resultAlert" role="status" aria-live="polite">
+        <div class="upload-result-grade">
+          <span class="grade-badge" id="uploadGrade">—</span>
+          <div>
+            <div class="results-grade-label">Security grade</div>
+            <strong id="uploadAssessment"></strong>
+          </div>
+        </div>
+        <div class="upload-result-score">
+          <strong><span id="uploadScore">—</span><small> / 100</small></strong>
+          <span id="uploadCounts"></span>
+        </div>
+      </div>
       <div class="flex gap-2 mt-2">
         <a id="viewResultsBtn" href="#" class="btn btn-primary">View Results →</a>
         <button class="btn btn-ghost" onclick="resetForm()">Scan Another File</button>
@@ -172,8 +181,6 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
   document.getElementById('submitBtn').disabled = true;
   document.getElementById('progressArea').classList.remove('hidden');
   document.getElementById('fileInfo').classList.add('hidden');
-  animateProgress();
-
   const formData = new FormData();
   formData.append('file', file);
 
@@ -188,10 +195,14 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     // Success
     document.getElementById('progressArea').classList.add('hidden');
     document.getElementById('resultArea').classList.remove('hidden');
-    document.getElementById('resultAlert').innerHTML =
-      `Scan complete — <strong>${data.findings}</strong> finding${data.findings !== 1 ? 's' : ''} in
-       <strong>${data.files_scanned}</strong> file${data.files_scanned !== 1 ? 's' : ''}.
-       Security grade: <strong>${data.security_grade || '—'}</strong>`;
+    const grade = data.security_grade || '—';
+    const gradeEl = document.getElementById('uploadGrade');
+    gradeEl.textContent = grade;
+    gradeEl.className = `grade-badge grade-${grade.charAt(0)}`;
+    document.getElementById('uploadScore').textContent = Math.round(data.security_score ?? 0);
+    document.getElementById('uploadAssessment').textContent = data.scoring_details?.assessment || '';
+    document.getElementById('uploadCounts').textContent =
+      `${data.findings} finding${data.findings !== 1 ? 's' : ''} · ${data.files_scanned} file${data.files_scanned !== 1 ? 's' : ''} scanned`;
     document.getElementById('viewResultsBtn').href = `/scan/${data.scan_id}`;
 
   } catch(err) {
@@ -206,25 +217,6 @@ function resetForm() {
   clearFile();
   document.getElementById('resultArea').classList.add('hidden');
   document.getElementById('submitBtn').disabled = true;
-}
-
-// Fake progress animation while waiting
-let _progInterval = null;
-function animateProgress() {
-  let pct = 0;
-  const fill = document.getElementById('progressFill');
-  const msg  = document.getElementById('progressMsg');
-  clearInterval(_progInterval);
-  _progInterval = setInterval(() => {
-    pct = pct < 30 ? pct + 2 :   // upload phase
-          pct < 70 ? pct + 1 :   // scan phase
-          pct < 92 ? pct + 0.3 : pct; // finalising
-    fill.style.width = pct + '%';
-    msg.textContent =
-      pct < 35 ? 'Uploading file…' :
-      pct < 70 ? 'Scanning for vulnerabilities…' :
-      'Finalising results…';
-  }, 80);
 }
 
 // ── Rules reference grid ──────────────────────────────────────────────

@@ -420,7 +420,7 @@ class ComprehensiveScorer:
         "high": 25,
         "medium": 12,
         "low": 5,
-        "info": 1,
+        "info": 0,
     }
 
     def __init__(self):
@@ -594,7 +594,7 @@ class ComprehensiveScorer:
             "methodology": {
                 "primary_score": (
                     "100 minus fixed severity deductions per finding "
-                    "(critical 40, high 25, medium 12, low 5, info 1); "
+                    "(critical 40, high 25, medium 12, low 5, info 0); "
                     "clamped to 0-100. Confidence and context do not affect it."
                 ),
                 "grade_scale": "A+ (90-100), A (85-89), A- (80-84), B+ (75-79), B (70-74), "

@@ -215,13 +215,14 @@ ALGORITHM SYNTHESIS: PRIMARY SCORE CALCULATION
 
         Primary score uses finding severity counts only:
         Score = clamp(100 - (critical × 40 + high × 25 + medium × 12
-                             + low × 5 + info × 1), 0, 100)
+                             + low × 5), 0, 100)
+        Informational findings do not reduce the score.
         Confidence, file context, and supplementary scorers do not affect it.
 
         Example counts:
-        1 critical + 1 high + 1 medium + 1 low + 1 info
-        Deductions = 40 + 25 + 12 + 5 + 1 = 83
-        Score = 100 - 83 = 17 / 100
+        1 critical + 1 high + 1 medium + 1 low + any info
+        Deductions = 40 + 25 + 12 + 5 = 82
+        Score = 100 - 82 = 18 / 100
         
                          │
                          ▼

@@ -47,7 +47,7 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     Start at 100:
-    Critical -40 | High -25 | Medium -12 | Low -5 | Info -1
+    Critical -40 | High -25 | Medium -12 | Low -5 | Info -0
     Clamp to 0-100, then use the grade scale below.
     Confidence, context, and supplementary algorithms do not affect
     the primary score or grade. Risk level and entropy remain supplemental.

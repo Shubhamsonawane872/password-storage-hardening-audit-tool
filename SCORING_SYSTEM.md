@@ -175,9 +175,9 @@ Primary Score = clamp(100 - total severity deductions, 0, 100)
 | High | 25 |
 | Medium | 12 |
 | Low | 5 |
-| Info | 1 |
+| Info | 0 |
 
-Each finding contributes once according to its severity. Confidence, file context, and supplementary algorithm scores do not affect this primary score. The existing letter-grade thresholds below are applied to the resulting score.
+Each security finding contributes once according to its severity. Informational findings (including positive modern-hashing detections) do not reduce the security score. Confidence, file context, and supplementary algorithm scores do not affect this primary score. The existing letter-grade thresholds below are applied to the resulting score.
 
 ### Grade Scale
 

@@ -31,72 +31,75 @@
     </div>
   </div>
 
-  <!-- Score + stat row -->
-  <div class="stat-grid mb-3" id="statRow">
-    <div class="stat-box stat-primary">
-      <span class="stat-label">Files Scanned</span>
-      <span class="stat-number" id="stFiles">—</span>
-    </div>
-    <div class="stat-box" id="scoreBox">
-      <span class="stat-label">Security Score</span>
-      <div class="flex items-center gap-2" style="margin-top:4px;">
-        <span class="stat-number" id="stScore">—</span>
-        <span class="grade-badge" id="stGrade" style="width:34px;height:34px;font-size:15px;">—</span>
+  <section class="results-overview" aria-label="Scan summary">
+    <div class="results-grade" id="scoreBox">
+      <span class="grade-badge" id="stGrade" aria-label="Security grade">—</span>
+      <div>
+        <div class="results-grade-label">Security grade</div>
+        <div class="results-assessment" id="gradeAssessment">Calculating result…</div>
+      </div>
+      <div class="results-score">
+        <span class="results-grade-label">Score</span>
+        <strong><span id="stScore">—</span><small> / 100</small></strong>
+      </div>
+      <div class="results-total">
+        <strong id="stTotal">—</strong>
+        <span>security issues</span>
       </div>
     </div>
-    <div class="stat-box stat-critical">
-      <span class="stat-label">Critical</span>
-      <span class="stat-number" id="stCrit">—</span>
-    </div>
-    <div class="stat-box stat-high">
-      <span class="stat-label">High</span>
-      <span class="stat-number" id="stHigh">—</span>
-    </div>
-    <div class="stat-box stat-medium">
-      <span class="stat-label">Medium</span>
-      <span class="stat-number" id="stMed">—</span>
-    </div>
-    <div class="stat-box stat-low">
-      <span class="stat-label">Low / Info</span>
-      <span class="stat-number" id="stLow">—</span>
+    <div class="results-severity" aria-label="Findings by severity">
+      <div class="severity-count sev-critical"><strong id="stCrit">0</strong><span>Critical</span></div>
+      <div class="severity-count sev-high"><strong id="stHigh">0</strong><span>High</span></div>
+      <div class="severity-count sev-medium"><strong id="stMed">0</strong><span>Medium</span></div>
+      <div class="severity-count sev-low"><strong id="stLow">0</strong><span>Low</span></div>
+      <div class="severity-count sev-info"><strong id="stInfo">0</strong><span>Informational</span></div>
     </div>
   </div>
 
-  <!-- Filters -->
-  <div class="filters mb-2">
-    <input  class="form-control" id="filterSearch"
-            placeholder="Search rule, file, description…" oninput="applyFilters()">
+  <div class="findings-heading">
+    <div>
+      <h2>Scan findings</h2>
+      <p id="filterSummary" aria-live="polite"></p>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="toggleInfoBtn" type="button"
+            onclick="toggleInfoFindings()" hidden>Show informational</button>
+  </div>
 
-    <select class="form-control" id="filterSev" onchange="applyFilters()">
-      <option value="">All Severities</option>
+  <div class="filters results-filters">
+    <input  class="form-control" id="filterSearch"
+            placeholder="Search findings…" oninput="applyFilters()"
+            aria-label="Search findings">
+
+    <select class="form-control" id="filterSev" onchange="applyFilters()" aria-label="Filter by severity">
+      <option value="">All issues</option>
       <option value="critical">Critical</option>
       <option value="high">High</option>
       <option value="medium">Medium</option>
       <option value="low">Low</option>
-      <option value="info">Info</option>
     </select>
 
-    <select class="form-control" id="filterRule" onchange="applyFilters()">
-      <option value="">All Rules</option>
-    </select>
+    <details class="results-advanced">
+      <summary>More filters</summary>
+      <div class="results-advanced-panel">
+        <select class="form-control" id="filterRule" onchange="applyFilters()" aria-label="Filter by rule">
+          <option value="">All rules</option>
+        </select>
+        <select class="form-control" id="filterConf" onchange="applyFilters()" aria-label="Minimum confidence">
+          <option value="0">Any confidence</option>
+          <option value="0.5">≥ 50% confidence</option>
+          <option value="0.7">≥ 70% confidence</option>
+          <option value="0.9">≥ 90% confidence</option>
+        </select>
+        <select class="form-control" id="filterPerPage" onchange="changePerPage()" aria-label="Findings per page">
+          <option value="20" selected>20 per page</option>
+          <option value="50">50 per page</option>
+          <option value="100">100 per page</option>
+        </select>
+      </div>
+    </details>
 
-    <select class="form-control" id="filterConf" onchange="applyFilters()">
-      <option value="0">Any Confidence</option>
-      <option value="0.5">≥ 50%</option>
-      <option value="0.7">≥ 70%</option>
-      <option value="0.9">≥ 90%</option>
-    </select>
-
-    <select class="form-control" id="filterPerPage" onchange="changePerPage()">
-      <option value="20" selected>20 / page</option>
-      <option value="50">50 / page</option>
-      <option value="100">100 / page</option>
-    </select>
-
-    <button class="btn btn-ghost btn-sm" onclick="resetFilters()">Clear</button>
+    <button class="btn btn-ghost btn-sm" onclick="resetFilters()">Clear filters</button>
   </div>
-
-  <div id="filterSummary" style="font-size:13px;color:var(--text3);margin-bottom:12px;"></div>
 
   <!-- Findings list -->
   <div id="findingsList"></div>
@@ -132,6 +135,7 @@ let _all       = [];   // all findings fetched
 let _filtered  = [];
 let _page      = 1;
 let _perPage   = 20;
+let _includeInfo = false;
 
 const SEV_ORDER = { critical:1, high:2, medium:3, low:4, info:5 };
 
@@ -146,6 +150,10 @@ async function init() {
     populateHeader(scanData.scan);
     populateRuleFilter(rulesData.rules);
     _all = scanData.findings;
+    const infoCount = _all.filter(f => f.severity === 'info').length;
+    const infoButton = document.getElementById('toggleInfoBtn');
+    infoButton.hidden = infoCount === 0;
+    infoButton.textContent = `Show informational (${infoCount})`;
     _all.sort((a, b) =>
       (SEV_ORDER[a.severity] || 9) - (SEV_ORDER[b.severity] || 9) ||
       (a.line_number || 0) - (b.line_number || 0)
@@ -166,22 +174,45 @@ function populateHeader(scan) {
     : `Started ${new Date(scan.created_at).toLocaleString()}`;
   document.getElementById('scanMeta').textContent = completed;
 
-  document.getElementById('stFiles').textContent = scan.total_files_scanned ?? 0;
-  document.getElementById('stCrit').textContent  = scan.critical_count ?? 0;
-  document.getElementById('stHigh').textContent  = scan.high_count ?? 0;
-  document.getElementById('stMed').textContent   = scan.medium_count ?? 0;
-  document.getElementById('stLow').textContent   = (scan.low_count ?? 0) + (scan.info_count ?? 0);
+  document.getElementById('scanMeta').textContent +=
+    ` · ${scan.total_files_scanned ?? 0} file${scan.total_files_scanned === 1 ? '' : 's'} scanned`;
+  const issueCount = (scan.critical_count ?? 0) + (scan.high_count ?? 0) +
+    (scan.medium_count ?? 0) + (scan.low_count ?? 0);
+  document.getElementById('stTotal').textContent = issueCount;
+  document.getElementById('stCrit').textContent = scan.critical_count ?? 0;
+  document.getElementById('stHigh').textContent = scan.high_count ?? 0;
+  document.getElementById('stMed').textContent = scan.medium_count ?? 0;
+  document.getElementById('stLow').textContent = scan.low_count ?? 0;
+  document.getElementById('stInfo').textContent = scan.info_count ?? 0;
 
   if (scan.security_score !== null && scan.security_score !== undefined) {
     document.getElementById('stScore').textContent = Math.round(scan.security_score);
     const grade = scan.security_grade || '—';
     const gEl   = document.getElementById('stGrade');
     gEl.textContent = grade;
-    gEl.className   = `grade-badge grade-${grade.replace('+', '\\+')}`;
+    gEl.className   = `grade-badge grade-${grade.charAt(0)}`;
+    document.getElementById('gradeAssessment').textContent = gradeAssessment(grade);
   } else {
     document.getElementById('stScore').textContent = '—';
     document.getElementById('stGrade').textContent = '—';
+    document.getElementById('gradeAssessment').textContent = 'Score not available';
   }
+}
+
+function gradeAssessment(grade) {
+  const descriptions = {
+    'A+': 'No scored security issues found',
+    'A': 'Very good — minor issues to review',
+    'A-': 'Good — review low-risk issues',
+    'B+': 'Fair — address identified issues',
+    'B': 'Some security improvements needed',
+    'B-': 'Review and fix the reported issues',
+    'C+': 'Needs improvement',
+    'C': 'Significant issues need attention',
+    'D': 'High impact — prioritize remediation',
+    'F': 'Very high impact — prioritize remediation',
+  };
+  return descriptions[grade] || 'Assessment unavailable';
 }
 
 function populateRuleFilter(rules) {
@@ -194,6 +225,14 @@ function populateRuleFilter(rules) {
   });
 }
 
+function toggleInfoFindings() {
+  _includeInfo = !_includeInfo;
+  const count = _all.filter(f => f.severity === 'info').length;
+  document.getElementById('toggleInfoBtn').textContent =
+    `${_includeInfo ? 'Hide' : 'Show'} informational (${count})`;
+  applyFilters();
+}
+
 // ── Filters ───────────────────────────────────────────────────────────
 function applyFilters() {
   const search  = document.getElementById('filterSearch').value.toLowerCase();
@@ -202,6 +241,7 @@ function applyFilters() {
   const minConf = parseFloat(document.getElementById('filterConf').value) || 0;
 
   _filtered = _all.filter(f => {
+    if (!_includeInfo && f.severity === 'info') return false;
     if (sev  && f.severity !== sev) return false;
     if (rule && f.rule_id  !== rule) return false;
     if ((f.confidence ?? 0) < minConf) return false;
@@ -216,8 +256,9 @@ function applyFilters() {
   });
 
   _page = 1;
+  const issueCount = _all.filter(f => f.severity !== 'info').length;
   document.getElementById('filterSummary').textContent =
-    `Showing ${_filtered.length} of ${_all.length} finding${_all.length !== 1 ? 's' : ''}`;
+    `${_filtered.length} of ${_includeInfo ? _all.length : issueCount} ${_includeInfo ? 'findings' : 'security issues'}`;
   renderPage();
 }
 
@@ -226,6 +267,9 @@ function resetFilters() {
     const el = document.getElementById(id);
     el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
   });
+  _includeInfo = false;
+  const infoCount = _all.filter(f => f.severity === 'info').length;
+  document.getElementById('toggleInfoBtn').textContent = `Show informational (${infoCount})`;
   applyFilters();
 }
 
@@ -249,57 +293,40 @@ function renderFindings(findings) {
   const el = document.getElementById('findingsList');
 
   if (!findings.length) {
+    const hasSecurityIssues = _all.some(f => f.severity !== 'info');
+    const onlyInformational = !_includeInfo && !hasSecurityIssues &&
+      _all.some(f => f.severity === 'info');
     el.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">✅</div>
-        <div class="empty-title">No findings match your filters</div>
-        <div class="empty-desc">This is a good sign! Try clearing filters to see all results.</div>
-        <button class="btn btn-ghost" onclick="resetFilters()">Clear Filters</button>
+        <div class="empty-icon">${onlyInformational || !_all.length ? '✅' : '🔎'}</div>
+        <div class="empty-title">${onlyInformational || !_all.length ? 'No security issues found' : 'No findings match your filters'}</div>
+        <div class="empty-desc">${onlyInformational ? 'Only informational checks were reported. Your score is not reduced by these checks.' : 'Try changing or clearing the filters.'}</div>
+        ${onlyInformational ? `<button class="btn btn-ghost" onclick="toggleInfoFindings()">Show informational checks</button>` : `<button class="btn btn-ghost" onclick="resetFilters()">Clear filters</button>`}
       </div>`;
     return;
   }
 
   el.innerHTML = findings.map(f => {
     const conf    = Math.round((f.confidence ?? 0) * 100);
-    const confCol = conf >= 90 ? 'var(--danger)' : conf >= 70 ? 'var(--warning)' : 'var(--success)';
-    const lineTxt = f.line_number ? `Line ${f.line_number}` : 'No line info';
 
     return `
     <div class="finding-card sev-${f.severity}">
-      <div class="flex items-center justify-between flex-wrap gap-2" style="margin-bottom:8px;">
+      <div class="finding-heading">
         <div class="finding-title">${escapeHtml(f.rule_id)}: ${escapeHtml(f.rule_title)}</div>
         <span class="badge badge-${f.severity}">${f.severity.toUpperCase()}</span>
       </div>
 
       <div class="finding-meta">
-        <span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          ${escapeHtml(f.file_name || 'unknown')}
-        </span>
-        <span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          ${lineTxt}
-        </span>
-        <span>Rule ${escapeHtml(f.rule_id)}</span>
+        <code>${escapeHtml(f.file_name || 'unknown')}:${f.line_number || '—'}</code>
+        <span>${conf}% confidence</span>
       </div>
 
-      <div class="finding-body">${escapeHtml(f.description || '')}</div>
-
-      ${f.evidence ? `
-        <div class="finding-evidence">${escapeHtml(f.evidence)}</div>` : ''}
-
-      ${f.recommendation ? `
-        <div class="finding-rec">
-          <strong>Recommendation:</strong> ${escapeHtml(f.recommendation)}
-        </div>` : ''}
-
-      <div class="confidence-bar" style="margin-top:12px;">
-        <span>Confidence</span>
-        <div class="confidence-track">
-          <div class="confidence-fill" style="width:${conf}%;background:${confCol};"></div>
-        </div>
-        <span style="color:${confCol};font-weight:600;">${conf}%</span>
-      </div>
+      <p class="finding-body">${escapeHtml(f.description || '')}</p>
+      <details class="finding-details">
+        <summary>View evidence and recommendation</summary>
+        ${f.evidence ? `<div class="finding-evidence">${escapeHtml(f.evidence)}</div>` : ''}
+        ${f.recommendation ? `<div class="finding-rec"><strong>Fix:</strong> ${escapeHtml(f.recommendation)}</div>` : ''}
+      </details>
     </div>`;
   }).join('');
 }

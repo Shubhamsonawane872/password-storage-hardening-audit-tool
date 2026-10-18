@@ -31,6 +31,18 @@
 
   .filters { flex-direction: column; }
   .filters .form-control { max-width: 100%; }
+  .results-grade { flex-wrap: wrap; padding: 18px; }
+  .results-score { margin-left: auto; }
+  .results-total { padding-left: 0; border-left: 0; }
+  .results-severity { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .results-filters > input.form-control,
+  .results-filters > select.form-control { flex-basis: auto; width: 100%; max-width: 100%; }
+  .results-advanced { width: 100%; }
+  .results-advanced summary { text-align: center; }
+  .results-advanced-panel { position: static; width: 100%; margin-top: 8px; }
+  .findings-heading { align-items: flex-start; }
+  .upload-result { align-items: flex-start; flex-direction: column; }
+  .upload-result-score { text-align: left; }
 
   .card { padding: 16px; }
   .modal { padding: 20px; }

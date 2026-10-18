@@ -6,7 +6,7 @@ The Password Audit Tool v2.0 now features a **comprehensive multi-algorithm scor
 
 ### Current Primary Grade Rule
 
-The stored score starts at 100 and deducts 40 per critical, 25 per high, 12 per medium, 5 per low, and 1 per info finding, clamped to 0–100. The existing letter-grade thresholds are applied to that score. Confidence, file context, and supplementary scoring algorithms do not affect the stored score or grade.
+The stored score starts at 100 and deducts 40 per critical, 25 per high, 12 per medium, and 5 per low finding, clamped to 0–100. Informational findings do not reduce the score. The existing letter-grade thresholds are applied to that score. Confidence, file context, and supplementary scoring algorithms do not affect the stored score or grade.
 
 ---
 
@@ -415,7 +415,7 @@ for algo_name, algo_result in report['algorithm_results'].items():
 
 ```
 PRIMARY SCORE = clamp(
-  100 - (critical × 40 + high × 25 + medium × 12 + low × 5 + info × 1),
+  100 - (critical × 40 + high × 25 + medium × 12 + low × 5),
   0,
   100
 )

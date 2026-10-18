@@ -1,7 +1,11 @@
 """Tests for finding-count-based primary security scores and grades."""
 
+from pathlib import Path
+
 import pytest
 
+from app.scanner.patterns import CodeScanner
+from app.scanner.rules import get_rule
 from app.scoring import ComprehensiveScorer
 
 
@@ -12,12 +16,13 @@ from app.scoring import ComprehensiveScorer
         (["medium"], 88, "A"),
         (["low"] * 4, 80, "A-"),
         (["high"], 75, "B+"),
-        (["high", "info"], 74, "B"),
+        (["high", "info"], 75, "B+"),
         (["low"] * 7, 65, "B-"),
         (["critical"], 60, "C+"),
-        (["critical", "info"], 59, "C"),
+        (["critical", "info"], 60, "C+"),
         (["high"] * 2, 50, "D"),
         (["critical"] * 2, 20, "F"),
+        (["info"] * 100, 100, "A+"),
     ],
 )
 def test_severity_combinations_produce_expected_score_and_grade(
@@ -43,7 +48,7 @@ def test_primary_score_uses_fixed_deduction_per_finding():
 
     report = scorer.score_all(findings)
 
-    assert report["scan_summary"]["overall_score"] == 17
+    assert report["scan_summary"]["overall_score"] == 18
     assert report["scan_summary"]["grade"] == "F"
 
 
@@ -75,3 +80,21 @@ def test_no_findings_get_full_score_and_top_grade():
 
     assert report["scan_summary"]["overall_score"] == 100
     assert report["scan_summary"]["grade"] == "A+"
+
+
+def test_safer_sample_information_does_not_lower_grade():
+    sample_path = Path("sample_apps/safer_sample.py")
+    raw_findings = CodeScanner().scan_file(
+        sample_path.name, sample_path.read_text(encoding="utf-8")
+    )
+    findings = [
+        {"severity": get_rule(finding["rule_id"])["severity"]}
+        for finding in raw_findings
+    ]
+
+    summary = ComprehensiveScorer().score_all(findings)["scan_summary"]
+
+    assert findings
+    assert all(finding["severity"] == "info" for finding in findings)
+    assert summary["overall_score"] == 100
+    assert summary["grade"] == "A+"

@@ -1,6 +1,6 @@
 # Scoring System Enhancements - v2.0
 
-> **Current primary score rule:** start at 100 and deduct 40 per critical, 25 per high, 12 per medium, 5 per low, and 1 per info finding; clamp to 0–100, then apply the existing grade scale. Confidence, context, and the supplementary algorithms do not affect the primary score or grade.
+> **Current primary score rule:** start at 100 and deduct 40 per critical, 25 per high, 12 per medium, and 5 per low finding; informational findings have no deduction. Clamp to 0–100, then apply the existing grade scale. Confidence, context, and the supplementary algorithms do not affect the primary score or grade.
 
 ## What Was Improved
 
@@ -158,7 +158,7 @@ result = scorer.calculate(findings)
 
 ### Primary Score Calculation:
 ```
-Score = clamp(100 - (critical × 40 + high × 25 + medium × 12 + low × 5 + info × 1), 0, 100)
+Score = clamp(100 - (critical × 40 + high × 25 + medium × 12 + low × 5), 0, 100)
 ```
 
 The CVSS-inspired, risk-level, confidence, weighted, and entropy algorithms remain supplementary report details; they do not determine the primary score or grade.
