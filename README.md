@@ -178,6 +178,16 @@ python run.py
 
 The application will start on `http://127.0.0.1:5000`
 
+### Deploying to Render
+
+Configure the Render web service with:
+
+- **Build command:** `pip install -r requirements.txt`
+- **Start command:** `gunicorn wsgi:app --bind 0.0.0.0:$PORT`
+- **Environment variables:** set `FLASK_ENV=production` and provide a strong, unique `SECRET_KEY`.
+
+The `wsgi:app` entry point is defined in `wsgi.py`, and Gunicorn is installed from `requirements.txt`.
+
 ### 8. Create Initial Admin (if not using demo data)
 
 You can manually create an admin in `app/__init__.py` or use the database directly:
